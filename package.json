@@ -1,0 +1,7 @@
+{
+  "name": "trade-inspector-v2",
+  "private": true,
+  "scripts": {
+    "check:ui": "node --check app/ui_v2/static/app.js && node --check app/ui_v2/static/app_patch.js"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "params": {
+    "now_ms": 1300,
+    "mode": "AUTO",
+    "dom_good_ms": 250,
+    "dom_degraded_ms": 1000,
+    "tape_good_ms": 250,
+    "tape_degraded_ms": 1000,
+    "snapshot_stale_ms": 2000,
+    "tape_enabled": true
+  },
+  "signature": {
+    "of_data_quality": "DEGRADED",
+    "of_data_confidence": 99,
+    "of_watch_allowed": true,
+    "of_confirmation_allowed": true,
+    "of_quality_note": "Tape DEGRADED | DOM GOOD | confirmation unlocked",
+    "orderflow_status": "ok"
+  }
+}

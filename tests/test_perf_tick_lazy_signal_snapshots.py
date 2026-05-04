@@ -1,0 +1,144 @@
+from __future__ import annotations
+
+import unittest
+from unittest.mock import patch
+
+import pandas as pd
+
+from app import backtest as backtest_mod
+from app.backtest import BacktestConfig, run_backtest_tick
+from app.rules import EntryFilterConfig, Rule
+
+
+class TickLazySignalSnapshotPerfTests(unittest.TestCase):
+    def _sample_stream(self) -> pd.DataFrame:
+        idx = pd.date_range("2026-01-01T00:00:00Z", periods=8, freq="1min", tz="UTC")
+        return pd.DataFrame(
+            {
+                "open": [100.0, 100.5, 101.0, 101.5, 102.0, 102.5, 103.0, 103.5],
+                "high": [100.2, 100.7, 101.2, 101.7, 102.2, 102.7, 103.2, 103.7],
+                "low": [99.8, 100.3, 100.8, 101.3, 101.8, 102.3, 102.8, 103.3],
+                "close": [100.0, 100.5, 101.0, 101.5, 102.0, 102.5, 103.0, 103.5],
+                "price": [100.0, 100.5, 101.0, 101.5, 102.0, 102.5, 103.0, 103.5],
+                "open_time": [ts - pd.Timedelta(minutes=1) + pd.Timedelta(milliseconds=1) for ts in idx],
+                "close_time": list(idx),
+                "volume": [10.0] * len(idx),
+                "macd": [-1.0, -0.5, 0.2, 0.3, 0.8, 0.4, 0.2, -0.2],
+                "signal": [-0.8, -0.4, 0.1, 0.2, 0.3, 0.35, 0.3, 0.1],
+                "ms": ["RED", "RED", "GREEN", "GREEN", "GREEN", "GREEN", "GREEN", "RED"],
+            },
+            index=idx,
+        )
+
+    def _cfg(self) -> BacktestConfig:
+        return BacktestConfig(
+            initial_balance=1000.0,
+            order_notional_usdt=100.0,
+            fee_rate=0.0,
+            slippage_bps=0.0,
+            stop_loss_mode="OFF",
+            take_profit_mode="OFF",
+            step_timeframe="1m",
+        )
+
+    def _joins(self, rules_model):
+        tab_join = {name: "AND" for name in rules_model.keys()}
+        group_join = {name: (["OR"] if rules_model[name] else []) for name in rules_model.keys()}
+        return tab_join, group_join
+
+    def test_tick_blocked_signal_does_not_materialize_full_snapshot(self) -> None:
+        df = self._sample_stream()
+        rules_model = {
+            "Long Entry": [[Rule(timeframe="1m", mode="event", field="ms_cross", op="CROSS", value="UP")]],
+            "Long Exit": [],
+            "Short Entry": [],
+            "Short Exit": [],
+        }
+        tab_join, group_join = self._joins(rules_model)
+        entry_filters = {
+            "Long Entry": EntryFilterConfig(enabled=True, mode="ANTI_CHASE"),
+        }
+        ticks = [
+            {"T": int((df.index[2] + pd.Timedelta(seconds=1)).value // 1_000_000), "p": "101.1"},
+        ]
+
+        real_build = backtest_mod._build_current_snapshots_for_row
+        full_snapshot_calls = 0
+
+        def counting_full_snapshot(*args, **kwargs):
+            nonlocal full_snapshot_calls
+            full_snapshot_calls += 1
+            return real_build(*args, **kwargs)
+
+        def blocking_signal_decision(side, cfg, signal_bar):
+            if str(side).upper() == "LONG":
+                return "BLOCK", "hard-skip:9.99atr"
+            return backtest_mod._entry_filter_signal_decision(side, cfg, signal_bar)
+
+        with patch("app.backtest.iter_aggtrades_futures_daily", return_value=ticks), \
+             patch("app.backtest._entry_filter_signal_decision", side_effect=blocking_signal_decision), \
+             patch("app.backtest._build_current_snapshots_for_row", side_effect=counting_full_snapshot):
+            result = run_backtest_tick(
+                symbol="BTCUSDT",
+                df_1m_full=df.copy(),
+                start=df.index[0],
+                end=df.index[-1],
+                tfs=["1m"],
+                rules_model=rules_model,
+                tab_group_join_mode=tab_join,
+                group_rule_join_mode=group_join,
+                cfg=self._cfg(),
+                streams_full={"1m": df.copy()},
+                entry_filters=entry_filters,
+            )
+
+        self.assertEqual(len(result.trades), 0)
+        self.assertEqual(full_snapshot_calls, 0)
+
+    def test_tick_open_materializes_lazy_signal_snapshot_once(self) -> None:
+        df = self._sample_stream()
+        rules_model = {
+            "Long Entry": [[Rule(timeframe="1m", mode="event", field="ms_cross", op="CROSS", value="UP")]],
+            "Long Exit": [],
+            "Short Entry": [],
+            "Short Exit": [],
+        }
+        tab_join, group_join = self._joins(rules_model)
+        ticks = [
+            {"T": int((df.index[2] + pd.Timedelta(seconds=1)).value // 1_000_000), "p": "101.1"},
+        ]
+
+        real_build = backtest_mod._build_current_snapshots_for_row
+        full_snapshot_calls = 0
+
+        def counting_full_snapshot(*args, **kwargs):
+            nonlocal full_snapshot_calls
+            full_snapshot_calls += 1
+            return real_build(*args, **kwargs)
+
+        with patch("app.backtest.iter_aggtrades_futures_daily", return_value=ticks), \
+             patch("app.backtest._build_current_snapshots_for_row", side_effect=counting_full_snapshot), \
+             patch("app.backtest._build_tab_rule_trace", return_value="lazy-trace"):
+            result = run_backtest_tick(
+                symbol="BTCUSDT",
+                df_1m_full=df.copy(),
+                start=df.index[0],
+                end=df.index[-1],
+                tfs=["1m"],
+                rules_model=rules_model,
+                tab_group_join_mode=tab_join,
+                group_rule_join_mode=group_join,
+                cfg=self._cfg(),
+                streams_full={"1m": df.copy()},
+            )
+
+        self.assertEqual(len(result.trades), 1)
+        self.assertEqual(full_snapshot_calls, 1)
+        trade = result.trades[0]
+        self.assertEqual(trade.entry_rule_trace, "lazy-trace")
+        self.assertIn("1m", trade.entry_snapshot)
+        self.assertEqual(trade.entry_snapshot["1m"].get("ms"), "GREEN")
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,2 @@
+trade_id,side,entry_time,exit_time,entry_price,exit_price,net_pnl,return_pct,duration_min,entry_reason,exit_reason,entry_rules_passed,entry_rules_failed,exit_rules_passed,exit_rules_failed,entry_market_state,entry_market_phase,entry_breakout_readiness,entry_breakout_confirmation,exit_market_state,exit_market_phase
+1,LONG,2026-01-01T00:00:00+00:00,2026-01-01T00:10:00+00:00,100.0,101.0,0.9,0.9,10,Long Entry,Long Exit,1,0,1,0,BREAKOUT_CONFIRM_LONG,EXPANSION,0.68,0.71,BULL_EXHAUSTION,EXHAUSTION

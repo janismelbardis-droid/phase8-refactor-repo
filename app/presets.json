@@ -1,0 +1,2547 @@
+{
+  "meta": {
+    "autoload_last": false,
+    "last_preset": "011"
+  },
+  "presets": {
+    "1": {
+      "version": 1,
+      "settings": {
+        "symbol": "BTCUSDT",
+        "start": "2025-01-01 00:00:00",
+        "end": "2026-04-04 00:00:00",
+        "warmup_min": 600,
+        "cache_dir": "data_cache",
+        "price_source": "LAST",
+        "macd_impl": "TRADINGVIEW",
+        "adx_impl": "TRADINGVIEW",
+        "ema_indicators": {
+          "defaults": {
+            "ema_1_length": 9,
+            "ema_2_length": 21
+          },
+          "overrides": {}
+        },
+        "live_forming": true,
+        "latch_until_flip": true,
+        "bt_mode": "Bar Close (1m candles)",
+        "timeframes": {
+          "1m": true,
+          "5m": false,
+          "15m": false,
+          "30m": false,
+          "1h": false
+        }
+      },
+      "tabs": {
+        "Long Entry": {
+          "groups_join": "AND",
+          "groups": [
+            {
+              "group_key": "A",
+              "rules_join": "OR",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_buy",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "require_still_valid": false
+                }
+              ]
+            }
+          ],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Long Exit": {
+          "groups_join": "AND",
+          "groups": [
+            {
+              "group_key": "A",
+              "rules_join": "OR",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_sell",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "require_still_valid": false
+                }
+              ]
+            }
+          ],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Short Entry": {
+          "groups_join": "AND",
+          "groups": [],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Short Exit": {
+          "groups_join": "AND",
+          "groups": [],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        }
+      },
+      "entry_filters": {
+        "Long Entry": {
+          "enabled": false,
+          "mode": "OFF",
+          "expansion_atr_mult": 2,
+          "hard_skip_atr_mult": 3,
+          "confirm_bars": 1,
+          "max_retrace_pct": 35,
+          "require_next_close_beyond_mid": true,
+          "require_setup_still_valid": true,
+          "apply_to_reversals": true,
+          "groups": {}
+        },
+        "Short Entry": {
+          "enabled": false,
+          "mode": "OFF",
+          "expansion_atr_mult": 2,
+          "hard_skip_atr_mult": 3,
+          "confirm_bars": 1,
+          "max_retrace_pct": 35,
+          "require_next_close_beyond_mid": true,
+          "require_setup_still_valid": true,
+          "apply_to_reversals": true,
+          "groups": {}
+        }
+      },
+      "meta": {
+        "strategy_note": "Preset scaffold for new"
+      }
+    },
+    "2": {
+      "version": 1,
+      "settings": {
+        "symbol": "BTCUSDT",
+        "start": "2025-01-01 00:00:00",
+        "end": "2026-04-04 00:00:00",
+        "warmup_min": 600,
+        "cache_dir": "data_cache",
+        "price_source": "LAST",
+        "macd_impl": "TRADINGVIEW",
+        "adx_impl": "TRADINGVIEW",
+        "ema_indicators": {
+          "defaults": {
+            "ema_1_length": 9,
+            "ema_2_length": 21
+          },
+          "overrides": {}
+        },
+        "live_forming": true,
+        "latch_until_flip": true,
+        "bt_mode": "Bar Close (1m candles)",
+        "timeframes": {
+          "1m": true,
+          "5m": false,
+          "15m": false,
+          "30m": false,
+          "1h": false
+        }
+      },
+      "tabs": {
+        "Long Entry": {
+          "groups_join": "AND",
+          "groups": [
+            {
+              "group_key": "A",
+              "rules_join": "OR",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_sell",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "require_still_valid": false
+                }
+              ]
+            }
+          ],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Long Exit": {
+          "groups_join": "AND",
+          "groups": [
+            {
+              "group_key": "A",
+              "rules_join": "OR",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_buy",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "require_still_valid": false
+                }
+              ]
+            }
+          ],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Short Entry": {
+          "groups_join": "AND",
+          "groups": [],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Short Exit": {
+          "groups_join": "AND",
+          "groups": [],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        }
+      },
+      "entry_filters": {
+        "Long Entry": {
+          "enabled": false,
+          "mode": "OFF",
+          "expansion_atr_mult": 2,
+          "hard_skip_atr_mult": 3,
+          "confirm_bars": 1,
+          "max_retrace_pct": 35,
+          "require_next_close_beyond_mid": true,
+          "require_setup_still_valid": true,
+          "apply_to_reversals": true,
+          "groups": {}
+        },
+        "Short Entry": {
+          "enabled": false,
+          "mode": "OFF",
+          "expansion_atr_mult": 2,
+          "hard_skip_atr_mult": 3,
+          "confirm_bars": 1,
+          "max_retrace_pct": 35,
+          "require_next_close_beyond_mid": true,
+          "require_setup_still_valid": true,
+          "apply_to_reversals": true,
+          "groups": {}
+        }
+      },
+      "meta": {
+        "strategy_note": "Preset scaffold for new"
+      }
+    },
+    "008": {
+      "version": 1,
+      "settings": {
+        "symbol": "BTCUSDT",
+        "start": "2025-01-01 00:00:00",
+        "end": "2026-04-04 00:00:00",
+        "warmup_min": 600,
+        "cache_dir": "data_cache",
+        "price_source": "LAST",
+        "macd_impl": "TRADINGVIEW",
+        "adx_impl": "TRADINGVIEW",
+        "ema_indicators": {
+          "defaults": {
+            "ema_1_length": 9,
+            "ema_2_length": 21
+          },
+          "overrides": {}
+        },
+        "rsi_indicators": {
+          "defaults": {
+            "length": 14,
+            "smoothing": 3
+          },
+          "overrides": {}
+        },
+        "live_forming": true,
+        "latch_until_flip": true,
+        "bt_mode": "Bar Close (1m candles)",
+        "timeframes": {
+          "1m": false,
+          "5m": false,
+          "15m": false,
+          "30m": false,
+          "1h": true
+        }
+      },
+      "tabs": {
+        "Long Entry": {
+          "groups_join": "AND",
+          "groups": [
+            {
+              "group_key": "A",
+              "rules_join": "OR",
+              "rules": [
+                {
+                  "timeframe": "1h",
+                  "mode": "event",
+                  "field": "range_filter_buy",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false
+                }
+              ]
+            }
+          ],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Long Exit": {
+          "groups_join": "AND",
+          "groups": [
+            {
+              "group_key": "A",
+              "rules_join": "OR",
+              "rules": [
+                {
+                  "timeframe": "1h",
+                  "mode": "event",
+                  "field": "range_filter_sell",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false
+                }
+              ]
+            }
+          ],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Short Entry": {
+          "groups_join": "AND",
+          "groups": [],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Short Exit": {
+          "groups_join": "AND",
+          "groups": [],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        }
+      },
+      "entry_filters": {
+        "Long Entry": {
+          "enabled": false,
+          "mode": "OFF",
+          "expansion_atr_mult": 2,
+          "hard_skip_atr_mult": 3,
+          "confirm_bars": 1,
+          "reference_range": "FULL_CANDLE",
+          "touch_type": "WICK",
+          "min_retrace_pct": 50,
+          "max_retrace_pct": 50,
+          "require_next_close_beyond_mid": true,
+          "require_setup_still_valid": true,
+          "apply_to_reversals": true,
+          "groups": {}
+        },
+        "Short Entry": {
+          "enabled": false,
+          "mode": "OFF",
+          "expansion_atr_mult": 2,
+          "hard_skip_atr_mult": 3,
+          "confirm_bars": 1,
+          "reference_range": "FULL_CANDLE",
+          "touch_type": "WICK",
+          "min_retrace_pct": 50,
+          "max_retrace_pct": 50,
+          "require_next_close_beyond_mid": true,
+          "require_setup_still_valid": true,
+          "apply_to_reversals": true,
+          "groups": {}
+        }
+      },
+      "meta": {
+        "strategy_note": "Preset scaffold for new"
+      }
+    },
+    "009": {
+      "version": 1,
+      "settings": {
+        "symbol": "BTCUSDT",
+        "start": "2026-04-15 00:00:00",
+        "end": "2026-04-15 22:00:00",
+        "warmup_min": 600,
+        "cache_dir": "data_cache",
+        "price_source": "LAST",
+        "macd_impl": "TRADINGVIEW",
+        "adx_impl": "TRADINGVIEW",
+        "ema_indicators": {
+          "defaults": {
+            "ema_1_length": 9,
+            "ema_2_length": 21
+          },
+          "overrides": {}
+        },
+        "rsi_indicators": {
+          "defaults": {
+            "length": 14,
+            "smoothing": 3
+          },
+          "overrides": {}
+        },
+        "live_forming": true,
+        "latch_until_flip": true,
+        "bt_mode": "Bar Close (1m candles)",
+        "timeframes": {
+          "1m": true,
+          "5m": false,
+          "15m": false,
+          "30m": false,
+          "1h": false
+        }
+      },
+      "tabs": {
+        "Long Entry": {
+          "groups_join": "AND",
+          "groups": [
+            {
+              "group_key": "A",
+              "rules_join": "SEQUENCE",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_buy",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "stoch_rsi_k",
+                  "op": "<=",
+                  "value": 20,
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false
+                }
+              ]
+            }
+          ],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Long Exit": {
+          "groups_join": "AND",
+          "groups": [
+            {
+              "group_key": "A",
+              "rules_join": "OR",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_sell",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false
+                }
+              ]
+            }
+          ],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Short Entry": {
+          "groups_join": "AND",
+          "groups": [],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Short Exit": {
+          "groups_join": "AND",
+          "groups": [],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        }
+      },
+      "entry_filters": {
+        "Long Entry": {
+          "enabled": false,
+          "mode": "OFF",
+          "expansion_atr_mult": 2,
+          "hard_skip_atr_mult": 3,
+          "confirm_bars": 1,
+          "reference_range": "FULL_CANDLE",
+          "touch_type": "WICK",
+          "min_retrace_pct": 50,
+          "max_retrace_pct": 50,
+          "require_next_close_beyond_mid": true,
+          "require_setup_still_valid": true,
+          "apply_to_reversals": true,
+          "groups": {}
+        },
+        "Short Entry": {
+          "enabled": false,
+          "mode": "OFF",
+          "expansion_atr_mult": 2,
+          "hard_skip_atr_mult": 3,
+          "confirm_bars": 1,
+          "reference_range": "FULL_CANDLE",
+          "touch_type": "WICK",
+          "min_retrace_pct": 50,
+          "max_retrace_pct": 50,
+          "require_next_close_beyond_mid": true,
+          "require_setup_still_valid": true,
+          "apply_to_reversals": true,
+          "groups": {}
+        }
+      },
+      "meta": {
+        "strategy_note": "Preset scaffold for new"
+      }
+    },
+    "010": {
+      "version": 1,
+      "settings": {
+        "symbol": "BTCUSDT",
+        "start": "2025-01-01 00:00:00",
+        "end": "2026-04-04 00:00:00",
+        "warmup_min": 600,
+        "cache_dir": "data_cache",
+        "price_source": "LAST",
+        "macd_impl": "TRADINGVIEW",
+        "adx_impl": "TRADINGVIEW",
+        "ema_indicators": {
+          "defaults": {
+            "ema_1_length": 9,
+            "ema_2_length": 21
+          },
+          "overrides": {}
+        },
+        "rsi_indicators": {
+          "defaults": {
+            "length": 14,
+            "smoothing": 3
+          },
+          "overrides": {}
+        },
+        "live_forming": true,
+        "latch_until_flip": true,
+        "bt_mode": "Bar Close (1m candles)",
+        "timeframes": {
+          "1m": true,
+          "5m": true,
+          "15m": true,
+          "30m": false,
+          "1h": false
+        }
+      },
+      "tabs": {
+        "Long Entry": {
+          "groups_join": "AND",
+          "groups": [
+            {
+              "group_key": "A",
+              "rules_join": "AND",
+              "rules": [
+                {
+                  "timeframe": "15m",
+                  "mode": "state",
+                  "field": "market_bias",
+                  "op": "=",
+                  "value": "LONG",
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false
+                },
+                {
+                  "timeframe": "5m",
+                  "mode": "state",
+                  "field": "ema_stack",
+                  "op": "=",
+                  "value": "BUY",
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false
+                },
+                {
+                  "timeframe": "5m",
+                  "mode": "state",
+                  "field": "ema_stack_pressure",
+                  "op": "=",
+                  "value": "BULL_ACCELERATING",
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false
+                },
+                {
+                  "timeframe": "5m",
+                  "mode": "state",
+                  "field": "adx",
+                  "op": ">=",
+                  "value": 18,
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false
+                }
+              ]
+            },
+            {
+              "group_key": "B",
+              "rules_join": "AND",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_buy",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "stoch_rsi_kd",
+                  "op": "=",
+                  "value": "GREEN",
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false
+                }
+              ]
+            }
+          ],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Long Exit": {
+          "groups_join": "AND",
+          "groups": [
+            {
+              "group_key": "A",
+              "rules_join": "OR",
+              "rules": [
+                {
+                  "timeframe": "5m",
+                  "mode": "event",
+                  "field": "range_filter_sell",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false
+                },
+                {
+                  "timeframe": "5m",
+                  "mode": "state",
+                  "field": "ema_stack",
+                  "op": "=",
+                  "value": "SELL",
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false
+                }
+              ]
+            }
+          ],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Short Entry": {
+          "groups_join": "AND",
+          "groups": [],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Short Exit": {
+          "groups_join": "AND",
+          "groups": [],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        }
+      },
+      "entry_filters": {
+        "Long Entry": {
+          "enabled": true,
+          "mode": "RETRACE_ON_EXPANSION",
+          "expansion_atr_mult": 1.8,
+          "hard_skip_atr_mult": 3,
+          "confirm_bars": 2,
+          "reference_range": "FULL_CANDLE",
+          "touch_type": "WICK",
+          "min_retrace_pct": 25,
+          "max_retrace_pct": 60,
+          "require_next_close_beyond_mid": false,
+          "require_setup_still_valid": true,
+          "apply_to_reversals": false,
+          "groups": {}
+        },
+        "Short Entry": {
+          "enabled": false,
+          "mode": "OFF",
+          "expansion_atr_mult": 2,
+          "hard_skip_atr_mult": 3,
+          "confirm_bars": 1,
+          "reference_range": "FULL_CANDLE",
+          "touch_type": "WICK",
+          "min_retrace_pct": 50,
+          "max_retrace_pct": 50,
+          "require_next_close_beyond_mid": true,
+          "require_setup_still_valid": true,
+          "apply_to_reversals": true,
+          "groups": {}
+        }
+      },
+      "meta": {
+        "strategy_note": "Bull regime continuation after pullback and 1m re-acceleration trigger."
+      }
+    },
+    "901": {
+      "version": 1,
+      "settings": {
+        "symbol": "BTCUSDT",
+        "start": "2025-01-01 00:00:00",
+        "end": "2026-04-17 23:59:59",
+        "warmup_min": 600,
+        "cache_dir": "data_cache",
+        "price_source": "LAST",
+        "macd_impl": "TRADINGVIEW",
+        "adx_impl": "TRADINGVIEW",
+        "ema_indicators": {
+          "defaults": {
+            "ema_1_length": 9,
+            "ema_2_length": 21
+          },
+          "overrides": {}
+        },
+        "rsi_indicators": {
+          "defaults": {
+            "length": 14,
+            "smoothing": 3
+          },
+          "overrides": {}
+        },
+        "live_forming": true,
+        "latch_until_flip": true,
+        "bt_mode": "Bar Close (1m candles)",
+        "timeframes": {
+          "1m": true,
+          "5m": true,
+          "15m": true,
+          "30m": true,
+          "1h": true
+        }
+      },
+      "tabs": {
+        "Long Entry": {
+          "groups_join": "AND",
+          "groups": [
+            {
+              "group_key": "A",
+              "rules_join": "SEQUENCE",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_buy",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "vidya_trend_up",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "vidya_state",
+                  "op": "=",
+                  "value": "BUY",
+                  "is_trigger": false,
+                  "is_final_gate": true,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "range_filter_state",
+                  "op": "=",
+                  "value": "BUY",
+                  "is_trigger": false,
+                  "is_final_gate": true,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_sell",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": true
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "vidya_trend_down",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": true
+                }
+              ]
+            },
+            {
+              "group_key": "B",
+              "rules_join": "AND",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "ms",
+                  "op": "=",
+                  "value": "GREEN",
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "stoch_rsi_kd",
+                  "op": "=",
+                  "value": "GREEN",
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "di_spread",
+                  "op": ">=",
+                  "value": 10.0,
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                }
+              ]
+            }
+          ],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Long Exit": {
+          "groups_join": "AND",
+          "groups": [
+            {
+              "group_key": "A",
+              "rules_join": "OR",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_sell",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "vidya_trend_down",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                }
+              ]
+            }
+          ],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Short Entry": {
+          "groups_join": "AND",
+          "groups": [],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Short Exit": {
+          "groups_join": "AND",
+          "groups": [],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        }
+      },
+      "entry_filters": {
+        "Long Entry": {
+          "enabled": true,
+          "mode": "RETRACE_ALWAYS",
+          "expansion_atr_mult": 2.0,
+          "hard_skip_atr_mult": 0.0,
+          "confirm_bars": 6,
+          "reference_range": "FULL_CANDLE",
+          "touch_type": "WICK",
+          "min_retrace_pct": 35.0,
+          "max_retrace_pct": 100.0,
+          "require_next_close_beyond_mid": true,
+          "require_setup_still_valid": false,
+          "apply_to_reversals": true,
+          "groups": {}
+        },
+        "Short Entry": {
+          "enabled": false,
+          "mode": "OFF",
+          "expansion_atr_mult": 2.0,
+          "hard_skip_atr_mult": 3.0,
+          "confirm_bars": 1,
+          "reference_range": "FULL_CANDLE",
+          "touch_type": "WICK",
+          "min_retrace_pct": 50.0,
+          "max_retrace_pct": 100.0,
+          "require_next_close_beyond_mid": true,
+          "require_setup_still_valid": true,
+          "apply_to_reversals": true,
+          "groups": {}
+        }
+      },
+      "meta": {
+        "research_name": "P1_anchor2_sweep_reclaim",
+        "strategy_note": "Research draft: A1 range buy -> A2 vidya buy flip with minimum DI spread strength, then require controlled pullback and reclaim. Intended primary coverage: cases 0001 and 0002."
+      }
+    },
+    "902": {
+      "version": 1,
+      "settings": {
+        "symbol": "BTCUSDT",
+        "start": "2025-01-01 00:00:00",
+        "end": "2026-04-17 23:59:59",
+        "warmup_min": 600,
+        "cache_dir": "data_cache",
+        "price_source": "LAST",
+        "macd_impl": "TRADINGVIEW",
+        "adx_impl": "TRADINGVIEW",
+        "ema_indicators": {
+          "defaults": {
+            "ema_1_length": 9,
+            "ema_2_length": 21
+          },
+          "overrides": {}
+        },
+        "rsi_indicators": {
+          "defaults": {
+            "length": 14,
+            "smoothing": 3
+          },
+          "overrides": {}
+        },
+        "live_forming": true,
+        "latch_until_flip": true,
+        "bt_mode": "Bar Close (1m candles)",
+        "timeframes": {
+          "1m": true,
+          "5m": true,
+          "15m": true,
+          "30m": true,
+          "1h": true
+        }
+      },
+      "tabs": {
+        "Long Entry": {
+          "groups_join": "AND",
+          "groups": [
+            {
+              "group_key": "A",
+              "rules_join": "SEQUENCE",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_buy",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "vidya_trend_up",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "stoch_rsi_kd",
+                  "op": "=",
+                  "value": "RED",
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "stoch_rsi_kd",
+                  "op": "=",
+                  "value": "GREEN",
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "vidya_state",
+                  "op": "=",
+                  "value": "BUY",
+                  "is_trigger": false,
+                  "is_final_gate": true,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "range_filter_state",
+                  "op": "=",
+                  "value": "BUY",
+                  "is_trigger": false,
+                  "is_final_gate": true,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_sell",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": true
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "vidya_trend_down",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": true
+                }
+              ]
+            },
+            {
+              "group_key": "B",
+              "rules_join": "AND",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "adx",
+                  "op": ">=",
+                  "value": 10,
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "ms",
+                  "op": "=",
+                  "value": "GREEN",
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                }
+              ]
+            }
+          ],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Long Exit": {
+          "groups_join": "AND",
+          "groups": [
+            {
+              "group_key": "A",
+              "rules_join": "OR",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_sell",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "vidya_trend_down",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                }
+              ]
+            }
+          ],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Short Entry": {
+          "groups_join": "AND",
+          "groups": [],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Short Exit": {
+          "groups_join": "AND",
+          "groups": [],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        }
+      },
+      "entry_filters": {
+        "Long Entry": {
+          "enabled": false,
+          "mode": "OFF",
+          "expansion_atr_mult": 2.0,
+          "hard_skip_atr_mult": 3.0,
+          "confirm_bars": 1,
+          "reference_range": "FULL_CANDLE",
+          "touch_type": "WICK",
+          "min_retrace_pct": 50.0,
+          "max_retrace_pct": 100.0,
+          "require_next_close_beyond_mid": true,
+          "require_setup_still_valid": true,
+          "apply_to_reversals": true,
+          "groups": {}
+        },
+        "Short Entry": {
+          "enabled": false,
+          "mode": "OFF",
+          "expansion_atr_mult": 2.0,
+          "hard_skip_atr_mult": 3.0,
+          "confirm_bars": 1,
+          "reference_range": "FULL_CANDLE",
+          "touch_type": "WICK",
+          "min_retrace_pct": 50.0,
+          "max_retrace_pct": 100.0,
+          "require_next_close_beyond_mid": true,
+          "require_setup_still_valid": true,
+          "apply_to_reversals": true,
+          "groups": {}
+        }
+      },
+      "meta": {
+        "research_name": "P2_double_anchor_sweep_reclaim",
+        "strategy_note": "Research draft: A1 range buy -> A2 vidya buy flip -> oscillator dip and reclaim while regime survives. Intended primary coverage: cases 0004 and 0005."
+      }
+    },
+    "903": {
+      "version": 1,
+      "settings": {
+        "symbol": "BTCUSDT",
+        "start": "2025-01-01 00:00:00",
+        "end": "2026-04-17 23:59:59",
+        "warmup_min": 600,
+        "cache_dir": "data_cache",
+        "price_source": "LAST",
+        "macd_impl": "TRADINGVIEW",
+        "adx_impl": "TRADINGVIEW",
+        "ema_indicators": {
+          "defaults": {
+            "ema_1_length": 9,
+            "ema_2_length": 21
+          },
+          "overrides": {}
+        },
+        "rsi_indicators": {
+          "defaults": {
+            "length": 14,
+            "smoothing": 3
+          },
+          "overrides": {}
+        },
+        "live_forming": true,
+        "latch_until_flip": true,
+        "bt_mode": "Bar Close (1m candles)",
+        "timeframes": {
+          "1m": true,
+          "5m": true,
+          "15m": true,
+          "30m": true,
+          "1h": true
+        }
+      },
+      "tabs": {
+        "Long Entry": {
+          "groups_join": "AND",
+          "groups": [
+            {
+              "group_key": "A",
+              "rules_join": "SEQUENCE",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_buy",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "vidya_trend_up",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "range_filter_state",
+                  "op": "=",
+                  "value": "NEUTRAL",
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_buy",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "vidya_state",
+                  "op": "=",
+                  "value": "BUY",
+                  "is_trigger": false,
+                  "is_final_gate": true,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "ms",
+                  "op": "=",
+                  "value": "GREEN",
+                  "is_trigger": false,
+                  "is_final_gate": true,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "stoch_rsi_kd",
+                  "op": "=",
+                  "value": "GREEN",
+                  "is_trigger": false,
+                  "is_final_gate": true,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "vidya_trend_down",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": true
+                }
+              ]
+            },
+            {
+              "group_key": "B",
+              "rules_join": "AND",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "adx",
+                  "op": ">=",
+                  "value": 10,
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "di_spread",
+                  "op": ">=",
+                  "value": 15,
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                }
+              ]
+            }
+          ],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Long Exit": {
+          "groups_join": "AND",
+          "groups": [
+            {
+              "group_key": "A",
+              "rules_join": "OR",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_sell",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "vidya_trend_down",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                }
+              ]
+            }
+          ],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Short Entry": {
+          "groups_join": "AND",
+          "groups": [],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Short Exit": {
+          "groups_join": "AND",
+          "groups": [],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        }
+      },
+      "entry_filters": {
+        "Long Entry": {
+          "enabled": false,
+          "mode": "OFF",
+          "expansion_atr_mult": 2.0,
+          "hard_skip_atr_mult": 3.0,
+          "confirm_bars": 1,
+          "reference_range": "FULL_CANDLE",
+          "touch_type": "WICK",
+          "min_retrace_pct": 50.0,
+          "max_retrace_pct": 100.0,
+          "require_next_close_beyond_mid": true,
+          "require_setup_still_valid": true,
+          "apply_to_reversals": true,
+          "groups": {}
+        },
+        "Short Entry": {
+          "enabled": false,
+          "mode": "OFF",
+          "expansion_atr_mult": 2.0,
+          "hard_skip_atr_mult": 3.0,
+          "confirm_bars": 1,
+          "reference_range": "FULL_CANDLE",
+          "touch_type": "WICK",
+          "min_retrace_pct": 50.0,
+          "max_retrace_pct": 100.0,
+          "require_next_close_beyond_mid": true,
+          "require_setup_still_valid": true,
+          "apply_to_reversals": true,
+          "groups": {}
+        }
+      },
+      "meta": {
+        "research_name": "P3_late_neutral_reentry",
+        "strategy_note": "Research draft: A1 range buy -> A2 vidya buy flip -> later RF neutral block -> fresh RF buy reclaim while VIDYA remains alive, gated by minimum DI spread strength. Intended primary coverage: case 0003."
+      }
+    },
+    "011": {
+      "version": 1,
+      "settings": {
+        "symbol": "BTCUSDT",
+        "start": "2025-01-01 00:00:00",
+        "end": "2026-04-17 23:59:59",
+        "warmup_min": 600,
+        "cache_dir": "data_cache",
+        "price_source": "LAST",
+        "macd_impl": "TRADINGVIEW",
+        "adx_impl": "TRADINGVIEW",
+        "ema_indicators": {
+          "defaults": {
+            "ema_1_length": 9,
+            "ema_2_length": 21
+          },
+          "overrides": {}
+        },
+        "rsi_indicators": {
+          "defaults": {
+            "length": 14,
+            "smoothing": 3
+          },
+          "overrides": {}
+        },
+        "live_forming": true,
+        "latch_until_flip": true,
+        "bt_mode": "Bar Close (1m candles)",
+        "timeframes": {
+          "1m": true,
+          "5m": true,
+          "15m": true,
+          "30m": true,
+          "1h": true
+        }
+      },
+      "tabs": {
+        "Long Entry": {
+          "groups_join": "AND",
+          "groups": [
+            {
+              "group_key": "A",
+              "rules_join": "SEQUENCE",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_buy",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "vidya_trend_up",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "vidya_state",
+                  "op": "=",
+                  "value": "BUY",
+                  "is_trigger": false,
+                  "is_final_gate": true,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "range_filter_state",
+                  "op": "=",
+                  "value": "BUY",
+                  "is_trigger": false,
+                  "is_final_gate": true,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_sell",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": true
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "vidya_trend_down",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": true
+                }
+              ]
+            },
+            {
+              "group_key": "B",
+              "rules_join": "AND",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "ms",
+                  "op": "=",
+                  "value": "GREEN",
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "stoch_rsi_kd",
+                  "op": "=",
+                  "value": "GREEN",
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "di_spread",
+                  "op": ">=",
+                  "value": 10.0,
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                }
+              ]
+            }
+          ],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Long Exit": {
+          "groups_join": "AND",
+          "groups": [
+            {
+              "group_key": "A",
+              "rules_join": "OR",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_sell",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "vidya_trend_down",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                }
+              ]
+            }
+          ],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Short Entry": {
+          "groups_join": "AND",
+          "groups": [],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Short Exit": {
+          "groups_join": "AND",
+          "groups": [],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        }
+      },
+      "entry_filters": {
+        "Long Entry": {
+          "enabled": true,
+          "mode": "RETRACE_ALWAYS",
+          "expansion_atr_mult": 2.0,
+          "hard_skip_atr_mult": 0.0,
+          "confirm_bars": 6,
+          "reference_range": "FULL_CANDLE",
+          "touch_type": "WICK",
+          "min_retrace_pct": 35.0,
+          "max_retrace_pct": 100.0,
+          "require_next_close_beyond_mid": true,
+          "require_setup_still_valid": false,
+          "apply_to_reversals": true,
+          "groups": {}
+        },
+        "Short Entry": {
+          "enabled": false,
+          "mode": "OFF",
+          "expansion_atr_mult": 2.0,
+          "hard_skip_atr_mult": 3.0,
+          "confirm_bars": 1,
+          "reference_range": "FULL_CANDLE",
+          "touch_type": "WICK",
+          "min_retrace_pct": 50.0,
+          "max_retrace_pct": 100.0,
+          "require_next_close_beyond_mid": true,
+          "require_setup_still_valid": true,
+          "apply_to_reversals": true,
+          "groups": {}
+        }
+      },
+      "meta": {
+        "research_name": "P1_anchor2_sweep_reclaim",
+        "strategy_note": "Research draft: A1 range buy -> A2 vidya buy flip with minimum DI spread strength, then require controlled pullback and reclaim. Intended primary coverage: cases 0001 and 0002."
+      }
+    },
+    "012": {
+      "version": 1,
+      "settings": {
+        "symbol": "BTCUSDT",
+        "start": "2025-01-01 00:00:00",
+        "end": "2026-04-17 23:59:59",
+        "warmup_min": 600,
+        "cache_dir": "data_cache",
+        "price_source": "LAST",
+        "macd_impl": "TRADINGVIEW",
+        "adx_impl": "TRADINGVIEW",
+        "ema_indicators": {
+          "defaults": {
+            "ema_1_length": 9,
+            "ema_2_length": 21
+          },
+          "overrides": {}
+        },
+        "rsi_indicators": {
+          "defaults": {
+            "length": 14,
+            "smoothing": 3
+          },
+          "overrides": {}
+        },
+        "live_forming": true,
+        "latch_until_flip": true,
+        "bt_mode": "Bar Close (1m candles)",
+        "timeframes": {
+          "1m": true,
+          "5m": true,
+          "15m": true,
+          "30m": true,
+          "1h": true
+        }
+      },
+      "tabs": {
+        "Long Entry": {
+          "groups_join": "AND",
+          "groups": [
+            {
+              "group_key": "A",
+              "rules_join": "SEQUENCE",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_buy",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "vidya_trend_up",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "stoch_rsi_kd",
+                  "op": "=",
+                  "value": "RED",
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "stoch_rsi_kd",
+                  "op": "=",
+                  "value": "GREEN",
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "vidya_state",
+                  "op": "=",
+                  "value": "BUY",
+                  "is_trigger": false,
+                  "is_final_gate": true,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "range_filter_state",
+                  "op": "=",
+                  "value": "BUY",
+                  "is_trigger": false,
+                  "is_final_gate": true,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_sell",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": true
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "vidya_trend_down",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": true
+                }
+              ]
+            },
+            {
+              "group_key": "B",
+              "rules_join": "AND",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "adx",
+                  "op": ">=",
+                  "value": 10,
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "ms",
+                  "op": "=",
+                  "value": "GREEN",
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                }
+              ]
+            }
+          ],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Long Exit": {
+          "groups_join": "AND",
+          "groups": [
+            {
+              "group_key": "A",
+              "rules_join": "OR",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_sell",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "vidya_trend_down",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                }
+              ]
+            }
+          ],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Short Entry": {
+          "groups_join": "AND",
+          "groups": [],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Short Exit": {
+          "groups_join": "AND",
+          "groups": [],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        }
+      },
+      "entry_filters": {
+        "Long Entry": {
+          "enabled": false,
+          "mode": "OFF",
+          "expansion_atr_mult": 2.0,
+          "hard_skip_atr_mult": 3.0,
+          "confirm_bars": 1,
+          "reference_range": "FULL_CANDLE",
+          "touch_type": "WICK",
+          "min_retrace_pct": 50.0,
+          "max_retrace_pct": 100.0,
+          "require_next_close_beyond_mid": true,
+          "require_setup_still_valid": true,
+          "apply_to_reversals": true,
+          "groups": {}
+        },
+        "Short Entry": {
+          "enabled": false,
+          "mode": "OFF",
+          "expansion_atr_mult": 2.0,
+          "hard_skip_atr_mult": 3.0,
+          "confirm_bars": 1,
+          "reference_range": "FULL_CANDLE",
+          "touch_type": "WICK",
+          "min_retrace_pct": 50.0,
+          "max_retrace_pct": 100.0,
+          "require_next_close_beyond_mid": true,
+          "require_setup_still_valid": true,
+          "apply_to_reversals": true,
+          "groups": {}
+        }
+      },
+      "meta": {
+        "research_name": "P2_double_anchor_sweep_reclaim",
+        "strategy_note": "Research draft: A1 range buy -> A2 vidya buy flip -> oscillator dip and reclaim while regime survives. Intended primary coverage: cases 0004 and 0005."
+      }
+    },
+    "013": {
+      "version": 1,
+      "settings": {
+        "symbol": "BTCUSDT",
+        "start": "2025-01-01 00:00:00",
+        "end": "2026-04-17 23:59:59",
+        "warmup_min": 600,
+        "cache_dir": "data_cache",
+        "price_source": "LAST",
+        "macd_impl": "TRADINGVIEW",
+        "adx_impl": "TRADINGVIEW",
+        "ema_indicators": {
+          "defaults": {
+            "ema_1_length": 9,
+            "ema_2_length": 21
+          },
+          "overrides": {}
+        },
+        "rsi_indicators": {
+          "defaults": {
+            "length": 14,
+            "smoothing": 3
+          },
+          "overrides": {}
+        },
+        "live_forming": true,
+        "latch_until_flip": true,
+        "bt_mode": "Bar Close (1m candles)",
+        "timeframes": {
+          "1m": true,
+          "5m": true,
+          "15m": true,
+          "30m": true,
+          "1h": true
+        }
+      },
+      "tabs": {
+        "Long Entry": {
+          "groups_join": "AND",
+          "groups": [
+            {
+              "group_key": "A",
+              "rules_join": "SEQUENCE",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_buy",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "vidya_trend_up",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "range_filter_state",
+                  "op": "=",
+                  "value": "NEUTRAL",
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_buy",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "vidya_state",
+                  "op": "=",
+                  "value": "BUY",
+                  "is_trigger": false,
+                  "is_final_gate": true,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "ms",
+                  "op": "=",
+                  "value": "GREEN",
+                  "is_trigger": false,
+                  "is_final_gate": true,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "stoch_rsi_kd",
+                  "op": "=",
+                  "value": "GREEN",
+                  "is_trigger": false,
+                  "is_final_gate": true,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "vidya_trend_down",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": true
+                }
+              ]
+            },
+            {
+              "group_key": "B",
+              "rules_join": "AND",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "adx",
+                  "op": ">=",
+                  "value": 10,
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "state",
+                  "field": "di_spread",
+                  "op": ">=",
+                  "value": 15,
+                  "is_trigger": false,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                }
+              ]
+            }
+          ],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Long Exit": {
+          "groups_join": "AND",
+          "groups": [
+            {
+              "group_key": "A",
+              "rules_join": "OR",
+              "rules": [
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "range_filter_sell",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                },
+                {
+                  "timeframe": "1m",
+                  "mode": "event",
+                  "field": "vidya_trend_down",
+                  "op": "EVENT",
+                  "value": null,
+                  "is_trigger": true,
+                  "is_final_gate": false,
+                  "bars_ago_mode": "OFF",
+                  "bars_ago_n": 0,
+                  "window_bars": 1,
+                  "require_still_valid": false,
+                  "is_sequence_canceler": false
+                }
+              ]
+            }
+          ],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Short Entry": {
+          "groups_join": "AND",
+          "groups": [],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        },
+        "Short Exit": {
+          "groups_join": "AND",
+          "groups": [],
+          "advanced_logic": {
+            "enabled": false,
+            "routes": []
+          }
+        }
+      },
+      "entry_filters": {
+        "Long Entry": {
+          "enabled": false,
+          "mode": "OFF",
+          "expansion_atr_mult": 2.0,
+          "hard_skip_atr_mult": 3.0,
+          "confirm_bars": 1,
+          "reference_range": "FULL_CANDLE",
+          "touch_type": "WICK",
+          "min_retrace_pct": 50.0,
+          "max_retrace_pct": 100.0,
+          "require_next_close_beyond_mid": true,
+          "require_setup_still_valid": true,
+          "apply_to_reversals": true,
+          "groups": {}
+        },
+        "Short Entry": {
+          "enabled": false,
+          "mode": "OFF",
+          "expansion_atr_mult": 2.0,
+          "hard_skip_atr_mult": 3.0,
+          "confirm_bars": 1,
+          "reference_range": "FULL_CANDLE",
+          "touch_type": "WICK",
+          "min_retrace_pct": 50.0,
+          "max_retrace_pct": 100.0,
+          "require_next_close_beyond_mid": true,
+          "require_setup_still_valid": true,
+          "apply_to_reversals": true,
+          "groups": {}
+        }
+      },
+      "meta": {
+        "research_name": "P3_late_neutral_reentry",
+        "strategy_note": "Research draft: A1 range buy -> A2 vidya buy flip -> later RF neutral block -> fresh RF buy reclaim while VIDYA remains alive, gated by minimum DI spread strength. Intended primary coverage: case 0003."
+      }
+    }
+  }
+}

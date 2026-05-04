@@ -1,0 +1,198 @@
+<svg width="1600" height="820" viewBox="0 0 1600 820" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a1220"/>
+      <stop offset="100%" stop-color="#0d1525"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#101c2d"/>
+      <stop offset="100%" stop-color="#0f1827"/>
+    </linearGradient>
+    <linearGradient id="panel2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f1a2b"/>
+      <stop offset="100%" stop-color="#0d1725"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="18" flood-color="#000814" flood-opacity="0.5"/>
+    </filter>
+    <style>
+      .title { font: 700 18px 'Segoe UI', Arial, sans-serif; fill: #f2f6ff; }
+      .meta { font: 500 11px 'Segoe UI', Arial, sans-serif; fill: #7f8ea7; letter-spacing: .06em; text-transform: uppercase; }
+      .body { font: 600 18px 'Segoe UI', Arial, sans-serif; fill: #eaf1ff; }
+      .bodySmall { font: 600 16px 'Segoe UI', Arial, sans-serif; fill: #dfe8fb; }
+      .value { font: 700 24px 'Segoe UI', Arial, sans-serif; fill: #f6f8ff; }
+      .green { fill: #34d399; }
+      .red { fill: #ff6b7e; }
+      .cyan { fill: #54d4ff; }
+      .muted { fill: #8b99b3; }
+      .label { font: 500 13px 'Segoe UI', Arial, sans-serif; fill: #8d9ab1; }
+      .tab { font: 600 13px 'Segoe UI', Arial, sans-serif; fill: #b7c5dd; }
+      .hint { font: 500 12px 'Segoe UI', Arial, sans-serif; fill: #7d8aa0; }
+      .pillText { font: 700 12px 'Segoe UI', Arial, sans-serif; fill: #eaf2ff; }
+      .sectionTitle { font: 700 28px 'Segoe UI', Arial, sans-serif; fill: #ffffff; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1600" height="820" fill="url(#bg)"/>
+
+  <text x="56" y="58" class="sectionTitle">Compact Live Top Row Concept</text>
+  <text x="56" y="88" class="hint">EMA is compressed to the same visual rhythm as RSI / Strength / Regime / Stoch RSI / MACD.</text>
+
+  <rect x="44" y="116" width="1512" height="250" rx="24" fill="#0d1725" stroke="#1a2a41" stroke-width="1.5"/>
+  <text x="68" y="148" class="meta">LIVE CONTROL SURFACE</text>
+
+  <g transform="translate(68,168)">
+    <rect x="0" y="0" width="54" height="26" rx="13" fill="#113551" stroke="#1f577d"/>
+    <text x="17" y="17" class="pillText">TF</text>
+    <text x="62" y="17" class="hint">1m</text>
+    <text x="100" y="17" class="hint">live websocket feed is active</text>
+  </g>
+
+  <g transform="translate(1270,164)">
+    <rect x="0" y="0" width="46" height="26" rx="13" fill="#0e2438" stroke="#244661"/>
+    <text x="15" y="17" class="tab">1m</text>
+    <rect x="56" y="0" width="46" height="26" rx="13" fill="#132b44" stroke="#2d5b84"/>
+    <text x="71" y="17" class="tab">5m</text>
+    <rect x="112" y="0" width="54" height="26" rx="13" fill="#0f1b2b" stroke="#24374d"/>
+    <text x="126" y="17" class="tab">15m</text>
+    <rect x="176" y="0" width="54" height="26" rx="13" fill="#0f1b2b" stroke="#24374d"/>
+    <text x="190" y="17" class="tab">30m</text>
+  </g>
+
+  <!-- EMA card -->
+  <g transform="translate(64,196)" filter="url(#shadow)">
+    <rect x="0" y="0" width="242" height="132" rx="18" fill="url(#panel)" stroke="#223450"/>
+    <text x="18" y="24" class="title">EMA</text>
+    <text x="56" y="24" class="meta">compact pair state</text>
+
+    <line x1="122" y1="34" x2="122" y2="110" stroke="#21324a"/>
+    <line x1="18" y1="58" x2="224" y2="58" stroke="#1b2b40"/>
+    <line x1="18" y1="86" x2="224" y2="86" stroke="#1b2b40"/>
+
+    <text x="18" y="50" class="meta">EMA 50</text>
+    <text x="18" y="76" class="body green">UP</text>
+    <text x="140" y="50" class="meta">EMA 200</text>
+    <text x="140" y="76" class="body red">DOWN</text>
+
+    <text x="18" y="104" class="meta">SPREAD</text>
+    <text x="18" y="126" class="bodySmall">250</text>
+    <text x="140" y="104" class="meta">Δ%</text>
+    <text x="140" y="126" class="bodySmall green">+0.43</text>
+
+    <rect x="152" y="92" width="72" height="22" rx="11" fill="#132940" stroke="#24425d"/>
+    <text x="165" y="107" class="pillText">Contracting</text>
+  </g>
+
+  <!-- RSI -->
+  <g transform="translate(320,196)" filter="url(#shadow)">
+    <rect x="0" y="0" width="204" height="132" rx="18" fill="url(#panel2)" stroke="#223450"/>
+    <text x="18" y="24" class="title">RSI</text>
+    <text x="52" y="24" class="meta">14/3</text>
+    <line x1="18" y1="58" x2="186" y2="58" stroke="#1b2b40"/>
+    <line x1="18" y1="86" x2="186" y2="86" stroke="#1b2b40"/>
+    <text x="18" y="50" class="meta">RSI</text>
+    <text x="18" y="76" class="body">48.46</text>
+    <text x="126" y="50" class="meta">ZONE</text>
+    <text x="126" y="76" class="bodySmall">Mid</text>
+    <text x="18" y="104" class="meta">SMOOTH</text>
+    <text x="18" y="126" class="bodySmall">48.31</text>
+    <text x="126" y="104" class="meta">STATE</text>
+    <text x="126" y="126" class="bodySmall green">GREEN</text>
+  </g>
+
+  <!-- Strength -->
+  <g transform="translate(538,196)" filter="url(#shadow)">
+    <rect x="0" y="0" width="180" height="132" rx="18" fill="url(#panel2)" stroke="#223450"/>
+    <text x="18" y="24" class="title">Strength</text>
+    <line x1="18" y1="58" x2="162" y2="58" stroke="#1b2b40"/>
+    <line x1="18" y1="86" x2="162" y2="86" stroke="#1b2b40"/>
+    <text x="18" y="50" class="meta">ADX</text>
+    <text x="18" y="76" class="body">18.6</text>
+    <text x="96" y="50" class="meta">ATR</text>
+    <text x="96" y="76" class="bodySmall">34.6</text>
+    <text x="18" y="104" class="meta">DI+</text>
+    <text x="18" y="126" class="bodySmall green">27.4</text>
+    <text x="96" y="104" class="meta">DI-</text>
+    <text x="96" y="126" class="bodySmall red">31.0</text>
+  </g>
+
+  <!-- Regime -->
+  <g transform="translate(732,196)" filter="url(#shadow)">
+    <rect x="0" y="0" width="220" height="132" rx="18" fill="url(#panel2)" stroke="#223450"/>
+    <text x="18" y="24" class="title">Regime</text>
+    <text x="74" y="24" class="meta">state summary</text>
+    <line x1="18" y1="58" x2="202" y2="58" stroke="#1b2b40"/>
+    <line x1="18" y1="86" x2="202" y2="86" stroke="#1b2b40"/>
+    <text x="18" y="50" class="meta">FRAMA</text>
+    <text x="18" y="76" class="body red">SELL</text>
+    <text x="116" y="50" class="meta">TRIGGER AGE</text>
+    <text x="116" y="76" class="bodySmall">25</text>
+    <text x="18" y="104" class="meta">RANGE</text>
+    <text x="18" y="126" class="bodySmall cyan">NEUTRAL</text>
+    <text x="116" y="104" class="meta">TRIGGER AGE</text>
+    <text x="116" y="126" class="bodySmall">4</text>
+  </g>
+
+  <!-- Stoch RSI -->
+  <g transform="translate(966,196)" filter="url(#shadow)">
+    <rect x="0" y="0" width="204" height="132" rx="18" fill="url(#panel2)" stroke="#223450"/>
+    <text x="18" y="24" class="title">Stoch RSI</text>
+    <text x="86" y="24" class="meta">tv k/d</text>
+    <line x1="18" y1="58" x2="186" y2="58" stroke="#1b2b40"/>
+    <line x1="18" y1="86" x2="186" y2="86" stroke="#1b2b40"/>
+    <text x="18" y="50" class="meta">K</text>
+    <text x="18" y="76" class="body red">10.54</text>
+    <text x="126" y="50" class="meta">ZONE</text>
+    <text x="126" y="76" class="bodySmall">20-</text>
+    <text x="18" y="104" class="meta">D</text>
+    <text x="18" y="126" class="bodySmall">13.24</text>
+    <text x="126" y="104" class="meta">KD</text>
+    <text x="126" y="126" class="bodySmall red">RED</text>
+  </g>
+
+  <!-- MACD -->
+  <g transform="translate(1184,196)" filter="url(#shadow)">
+    <rect x="0" y="0" width="204" height="132" rx="18" fill="url(#panel2)" stroke="#223450"/>
+    <text x="18" y="24" class="title">MACD</text>
+    <line x1="18" y1="58" x2="186" y2="58" stroke="#1b2b40"/>
+    <line x1="18" y1="86" x2="186" y2="86" stroke="#1b2b40"/>
+    <text x="18" y="50" class="meta">MACD</text>
+    <text x="18" y="76" class="body green">10.27</text>
+    <text x="126" y="50" class="meta">ANGLE</text>
+    <text x="126" y="76" class="bodySmall red">RED</text>
+    <text x="18" y="104" class="meta">SIGNAL</text>
+    <text x="18" y="126" class="bodySmall">19.34</text>
+    <text x="126" y="104" class="meta">MS</text>
+    <text x="126" y="126" class="bodySmall red">RED</text>
+  </g>
+
+  <text x="66" y="398" class="meta">Why this layout</text>
+  <text x="66" y="426" class="bodySmall">1. EMA stops being a tall special-case block and joins the same 3-row rhythm as the other cards.</text>
+  <text x="66" y="454" class="bodySmall">2. Pressure is removed from the top row, but kept in the detailed popup on click.</text>
+  <text x="66" y="482" class="bodySmall">3. Spread, delta %, and contracting/expanding stay visible because they are decision-grade EMA signals.</text>
+  <text x="66" y="510" class="bodySmall">4. The whole top area becomes shorter, so the rule groups below come into view sooner on a 15-inch screen.</text>
+
+  <g transform="translate(62,560)">
+    <rect x="0" y="0" width="1470" height="186" rx="20" fill="#0c1523" stroke="#17263b"/>
+    <text x="24" y="34" class="meta">Detail popup idea for EMA click</text>
+    <text x="24" y="68" class="bodySmall">Main strip stays compact. All secondary EMA details move here:</text>
+    <text x="24" y="100" class="bodySmall">• pressure / stack pressure</text>
+    <text x="24" y="126" class="bodySmall">• spread delta and spread trend breakdown</text>
+    <text x="24" y="152" class="bodySmall">• angle states / cross flags / extra diagnostics</text>
+
+    <rect x="820" y="26" width="620" height="130" rx="16" fill="#111e31" stroke="#223450"/>
+    <text x="844" y="54" class="title">EMA Detail Overlay</text>
+    <text x="844" y="82" class="label">EMA 50 slope</text>
+    <text x="990" y="82" class="bodySmall green">UP</text>
+    <text x="1100" y="82" class="label">EMA 200 slope</text>
+    <text x="1268" y="82" class="bodySmall red">DOWN</text>
+    <text x="844" y="112" class="label">Spread trend</text>
+    <text x="990" y="112" class="bodySmall">Contracting</text>
+    <text x="1100" y="112" class="label">Pressure</text>
+    <text x="1228" y="112" class="bodySmall red">Bear decel</text>
+    <text x="844" y="142" class="label">Cross flags</text>
+    <text x="990" y="142" class="bodySmall muted">none active</text>
+    <text x="1100" y="142" class="label">Δ spread</text>
+    <text x="1228" y="142" class="bodySmall">-2.18</text>
+  </g>
+</svg>

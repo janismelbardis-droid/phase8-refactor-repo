@@ -1,0 +1,105 @@
+//@version=6
+strategy("Preset 8 Comparator (Python vs TradingView)", overlay=true, initial_capital=1000, default_qty_type=strategy.cash, default_qty_value=100, commission_type=strategy.commission.percent, commission_value=0.04, pyramiding=0, process_orders_on_close=false, calc_on_order_fills=false, calc_on_every_tick=false)
+
+mode = input.string("Python current (reversal)", "Execution mode", options=["Python current (reversal)", "Legacy exit-only"])
+signalTf = input.timeframe("60", "Signal timeframe")
+rfPer = input.int(100, "Range Filter Period", minval=1)
+rfMult = input.float(3.0, "Range Filter Multiplier", minval=0.1, step=0.1)
+startTime = input.time(timestamp("UTC", 2025, 12, 29, 10, 22), "Start UTC")
+endTime = input.time(timestamp("UTC", 2026, 3, 29, 10, 22), "End UTC")
+showBands = input.bool(true, "Show HTF range filter bands")
+showSignals = input.bool(true, "Show HTF buy/sell pulses")
+
+f_range_filter() =>
+    var float prevSrc = na
+    var float prevFilt = na
+    var int condIni = 0
+    var float upward = 0.0
+    var float downward = 0.0
+
+    absDelta = not na(prevSrc) ? math.abs(close - prevSrc) : na
+    avrng = ta.ema(absDelta, rfPer)
+    smoothBase = ta.ema(avrng, rfPer * 2 - 1)
+    smoothRange = smoothBase * rfMult
+
+    prevFiltNz = nz(prevFilt, 0.0)
+    float filt = na
+    if not na(close) and not na(smoothRange)
+        if close > prevFiltNz
+            filt := (close - smoothRange) < prevFiltNz ? prevFiltNz : (close - smoothRange)
+        else
+            filt := (close + smoothRange) > prevFiltNz ? prevFiltNz : (close + smoothRange)
+
+    upwardPrev = nz(upward, 0.0)
+    downwardPrev = nz(downward, 0.0)
+    if not na(filt) and not na(prevFilt)
+        upward := filt > prevFilt ? upwardPrev + 1.0 : filt < prevFilt ? 0.0 : upwardPrev
+        downward := filt < prevFilt ? downwardPrev + 1.0 : filt > prevFilt ? 0.0 : downwardPrev
+    else
+        upward := upwardPrev
+        downward := downwardPrev
+
+    buyStrong = not na(prevSrc) and not na(filt) and close > filt and upward > 0 and close > prevSrc
+    buyWeak = not na(prevSrc) and not na(filt) and close > filt and upward > 0 and close < prevSrc
+    sellStrong = not na(prevSrc) and not na(filt) and close < filt and downward > 0 and close < prevSrc
+    sellWeak = not na(prevSrc) and not na(filt) and close < filt and downward > 0 and close > prevSrc
+
+    longCond = buyStrong or buyWeak
+    shortCond = sellStrong or sellWeak
+    prevCondIni = condIni
+    condIni := longCond ? 1 : shortCond ? -1 : prevCondIni
+
+    buyEvent = longCond and prevCondIni == -1
+    sellEvent = shortCond and prevCondIni == 1
+    upperBand = not na(filt) and not na(smoothRange) ? filt + smoothRange : na
+    lowerBand = not na(filt) and not na(smoothRange) ? filt - smoothRange : na
+
+    prevSrc := close
+    prevFilt := filt
+
+    [buyEvent ? 1.0 : 0.0, sellEvent ? 1.0 : 0.0, filt, upperBand, lowerBand, longCond ? 1.0 : 0.0, shortCond ? 1.0 : 0.0]
+
+[buyRaw, sellRaw, rfLine, rfUpper, rfLower, longCondRaw, shortCondRaw] = request.security(syminfo.tickerid, signalTf, f_range_filter(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+
+buyPulse = buyRaw > 0 and not (nz(buyRaw[1]) > 0)
+sellPulse = sellRaw > 0 and not (nz(sellRaw[1]) > 0)
+longCondNow = longCondRaw > 0
+shortCondNow = shortCondRaw > 0
+
+inWindow = time >= startTime and time <= endTime
+legacyExitOnly = mode == "Legacy exit-only"
+
+if inWindow
+    if legacyExitOnly
+        if strategy.position_size == 0 and buyPulse
+            strategy.entry("Long", strategy.long, comment="Long Entry")
+        if strategy.position_size > 0 and sellPulse
+            strategy.close("Long", comment="Long Exit")
+    else
+        if buyPulse
+            if strategy.position_size < 0
+                strategy.close("Short", comment="Short Exit")
+            if strategy.position_size <= 0
+                strategy.entry("Long", strategy.long, comment=strategy.position_size < 0 ? "Reverse to Long" : "Long Entry")
+        if sellPulse
+            if strategy.position_size > 0
+                strategy.close("Long", comment="Long Exit")
+            if strategy.position_size >= 0
+                strategy.entry("Short", strategy.short, comment=strategy.position_size > 0 ? "Reverse to Short" : "Short Entry")
+
+plot(rfLine, "1H Range Filter", color=color.yellow, linewidth=2)
+plot(showBands ? rfUpper : na, "1H Range Upper", color=color.new(color.green, 45))
+plot(showBands ? rfLower : na, "1H Range Lower", color=color.new(color.red, 45))
+
+plotshape(showSignals and buyPulse, title="1H Buy Pulse", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.tiny, text="1H Buy")
+plotshape(showSignals and sellPulse, title="1H Sell Pulse", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.tiny, text="1H Sell")
+
+bgcolor(inWindow ? na : color.new(color.gray, 92))
+
+var label note = na
+if barstate.islast
+    label.delete(note)
+    noteText = "Use on a 1m BTCUSDT chart.\n" +
+      "Default mode matches the fixed Python bar-close engine.\n" +
+      "Legacy mode shows the old exit-only behavior for comparison."
+    note := label.new(bar_index, high, noteText, style=label.style_label_upper_left, textcolor=color.white, color=color.new(color.black, 0))

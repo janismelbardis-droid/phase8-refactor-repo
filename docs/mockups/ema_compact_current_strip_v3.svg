@@ -1,0 +1,202 @@
+<svg width="1820" height="520" viewBox="0 0 1820 520" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a1220"/>
+      <stop offset="100%" stop-color="#0b1423"/>
+    </linearGradient>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0c1828"/>
+      <stop offset="100%" stop-color="#0d1625"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#101a29"/>
+      <stop offset="100%" stop-color="#0d1725"/>
+    </linearGradient>
+    <style>
+      .title { font: 700 15px 'Segoe UI', Arial, sans-serif; fill: #edf3ff; letter-spacing: .04em; text-transform: uppercase; }
+      .note { font: 500 12px 'Segoe UI', Arial, sans-serif; fill: #72839b; }
+      .small { font: 600 10px 'Segoe UI', Arial, sans-serif; fill: #7b8ca3; letter-spacing: .08em; text-transform: uppercase; }
+      .metric { font: 700 18px 'Segoe UI', Arial, sans-serif; fill: #eef4ff; }
+      .metricSm { font: 700 16px 'Segoe UI', Arial, sans-serif; fill: #eef4ff; }
+      .green { fill: #7be7ae; }
+      .red { fill: #ff7c93; }
+      .cyan { fill: #78e7de; }
+      .amber { fill: #f4d16e; }
+      .muted { fill: #93a0b5; }
+      .pillText { font: 700 11px 'Segoe UI', Arial, sans-serif; fill: #dce8ff; }
+      .header { font: 700 24px 'Segoe UI', Arial, sans-serif; fill: #f6f9ff; }
+    </style>
+  </defs>
+
+  <rect width="1820" height="520" fill="url(#bg)"/>
+
+  <text x="44" y="44" class="header">EMA Surgical Compact Mockup v3</text>
+  <text x="44" y="70" class="note">Only EMA is changed. All other cards stay as they are.</text>
+
+  <rect x="28" y="96" width="1764" height="276" rx="20" fill="url(#surface)" stroke="#18263a"/>
+
+  <text x="52" y="126" class="small">LIVE CONTROL SURFACE</text>
+  <text x="52" y="146" class="note">TF 15m  ·  live websocket feed is active</text>
+
+  <g transform="translate(56,178)">
+    <!-- EMA card: changed only -->
+    <g>
+      <rect x="0" y="0" width="278" height="160" rx="18" fill="url(#card)" stroke="#264363"/>
+      <text x="16" y="22" class="title">EMA Pair</text>
+
+      <!-- row 1: EMA short + EMA long -->
+      <rect x="10" y="34" width="258" height="36" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <line x1="139" y1="41" x2="139" y2="63" stroke="#1d3045"/>
+      <text x="22" y="49" class="small">EMA 9</text>
+      <text x="22" y="66" class="metricSm green">UP</text>
+      <text x="152" y="49" class="small">EMA 21</text>
+      <text x="152" y="66" class="metricSm green">UP</text>
+
+      <!-- row 2: Spread + Stack -->
+      <rect x="10" y="78" width="258" height="36" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <line x1="139" y1="85" x2="139" y2="107" stroke="#1d3045"/>
+      <text x="22" y="93" class="small">Spread</text>
+      <text x="22" y="110" class="metricSm">113.24</text>
+      <text x="152" y="93" class="small">Stack</text>
+      <text x="152" y="110" class="metricSm cyan">BUY</text>
+
+      <!-- row 3: delta spread + delta percent -->
+      <rect x="10" y="122" width="258" height="28" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <line x1="139" y1="127" x2="139" y2="145" stroke="#1d3045"/>
+      <text x="22" y="138" class="small">Δ Spread</text>
+      <text x="22" y="149" class="metricSm green">8.605</text>
+      <text x="152" y="138" class="small">Δ %</text>
+      <text x="152" y="149" class="metricSm cyan">0.014</text>
+
+      <text x="16" y="186" class="note">Trend and Pressure stay only in the EMA detail popup.</text>
+    </g>
+
+    <!-- RSI -->
+    <g transform="translate(294,0)">
+      <rect x="0" y="0" width="204" height="160" rx="18" fill="url(#card)" stroke="#1a2a41"/>
+      <text x="16" y="22" class="title">RSI</text>
+      <text x="184" y="22" text-anchor="end" class="small">14/3</text>
+      <rect x="10" y="34" width="124" height="36" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <rect x="142" y="34" width="52" height="36" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <text x="22" y="49" class="small">RSI</text>
+      <text x="22" y="66" class="metricSm">61.60</text>
+      <text x="154" y="49" class="small">Zone</text>
+      <text x="154" y="66" class="metricSm">Mid</text>
+      <rect x="10" y="78" width="124" height="36" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <rect x="142" y="78" width="52" height="36" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <text x="22" y="93" class="small">RSI Smooth</text>
+      <text x="22" y="110" class="metricSm">63.21</text>
+      <text x="154" y="93" class="small">State</text>
+      <text x="154" y="110" class="metricSm green">GREEN</text>
+      <rect x="10" y="122" width="124" height="28" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <rect x="142" y="122" width="52" height="28" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <text x="22" y="139" class="small">Stdev</text>
+      <text x="22" y="149" class="metricSm red">RED</text>
+      <text x="154" y="139" class="small">Gap</text>
+      <text x="154" y="149" class="metricSm red">-1.61</text>
+    </g>
+
+    <!-- Strength -->
+    <g transform="translate(514,0)">
+      <rect x="0" y="0" width="180" height="160" rx="18" fill="url(#card)" stroke="#1a2a41"/>
+      <text x="16" y="22" class="title">Strength</text>
+      <text x="86" y="22" class="note">ADX, ATR, directional flow</text>
+      <rect x="10" y="34" width="86" height="36" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <rect x="104" y="34" width="66" height="36" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <text x="22" y="49" class="small">ADX</text>
+      <text x="22" y="66" class="metricSm green">50.2</text>
+      <text x="116" y="49" class="small">ATR</text>
+      <text x="116" y="66" class="metricSm">246.6</text>
+      <rect x="10" y="78" width="86" height="36" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <rect x="104" y="78" width="66" height="36" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <text x="22" y="93" class="small">DI+</text>
+      <text x="22" y="110" class="metricSm">22.1</text>
+      <text x="116" y="93" class="small">DI-</text>
+      <text x="116" y="110" class="metricSm">5.9</text>
+      <rect x="10" y="122" width="160" height="28" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <text x="22" y="139" class="small">CI</text>
+      <text x="22" y="149" class="metricSm red">31.0</text>
+    </g>
+
+    <!-- Regime -->
+    <g transform="translate(710,0)">
+      <rect x="0" y="0" width="220" height="160" rx="18" fill="url(#card)" stroke="#1a2a41"/>
+      <text x="16" y="22" class="title">Regime</text>
+      <text x="72" y="22" class="note">State summary with age</text>
+      <rect x="10" y="34" width="96" height="36" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <rect x="114" y="34" width="96" height="36" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <text x="22" y="49" class="small">Frama</text>
+      <text x="22" y="66" class="metricSm green">BUY</text>
+      <text x="126" y="49" class="small">Trigger Age</text>
+      <text x="126" y="66" class="metricSm">37</text>
+      <rect x="10" y="78" width="96" height="36" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <rect x="114" y="78" width="96" height="36" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <text x="22" y="93" class="small">VIDYA</text>
+      <text x="22" y="110" class="metricSm green">BUY</text>
+      <text x="126" y="93" class="small">Delta %</text>
+      <text x="126" y="110" class="metricSm red">-58.24</text>
+      <rect x="10" y="122" width="96" height="28" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <rect x="114" y="122" width="96" height="28" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <text x="22" y="139" class="small">Range</text>
+      <text x="22" y="149" class="metricSm green">BUY</text>
+      <text x="126" y="139" class="small">Trigger Age</text>
+      <text x="126" y="149" class="metricSm">3</text>
+    </g>
+
+    <!-- Stoch RSI -->
+    <g transform="translate(946,0)">
+      <rect x="0" y="0" width="204" height="160" rx="18" fill="url(#card)" stroke="#1a2a41"/>
+      <text x="16" y="22" class="title">Stoch RSI</text>
+      <text x="92" y="22" class="note">TradingView %K / %D</text>
+      <rect x="10" y="34" width="124" height="36" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <rect x="142" y="34" width="52" height="36" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <text x="22" y="49" class="small">Stoch K</text>
+      <text x="22" y="66" class="metricSm cyan">93.05</text>
+      <text x="154" y="49" class="small">Zone</text>
+      <text x="154" y="66" class="metricSm amber">80+</text>
+      <rect x="10" y="78" width="124" height="36" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <rect x="142" y="78" width="52" height="36" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <text x="22" y="93" class="small">Stoch D</text>
+      <text x="22" y="110" class="metricSm">97.68</text>
+      <text x="154" y="93" class="small">KD</text>
+      <text x="154" y="110" class="metricSm red">RED</text>
+      <rect x="10" y="122" width="124" height="28" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <rect x="142" y="122" width="52" height="28" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <text x="22" y="139" class="small">Gap</text>
+      <text x="22" y="149" class="metricSm red">-4.63</text>
+    </g>
+
+    <!-- MACD -->
+    <g transform="translate(1166,0)">
+      <rect x="0" y="0" width="204" height="160" rx="18" fill="url(#card)" stroke="#1a2a41"/>
+      <text x="16" y="22" class="title">MACD</text>
+      <text x="74" y="22" class="note">Momentum, slope, PPO</text>
+      <rect x="10" y="34" width="124" height="36" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <rect x="142" y="34" width="52" height="36" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <text x="22" y="49" class="small">MACD</text>
+      <text x="22" y="66" class="metricSm green">110.59</text>
+      <text x="154" y="49" class="small">Angle</text>
+      <text x="154" y="66" class="metricSm green">GREEN</text>
+      <rect x="10" y="78" width="124" height="36" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <rect x="142" y="78" width="52" height="36" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <text x="22" y="93" class="small">Signal</text>
+      <text x="22" y="110" class="metricSm">76.36</text>
+      <text x="154" y="93" class="small">Sig Angle</text>
+      <text x="154" y="110" class="metricSm green">GREEN</text>
+      <rect x="10" y="122" width="86" height="28" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <rect x="104" y="122" width="90" height="28" rx="12" fill="#0a1220" stroke="#19283c"/>
+      <text x="22" y="139" class="small">MS</text>
+      <text x="22" y="149" class="metricSm green">GREEN</text>
+      <text x="116" y="139" class="small">PPO</text>
+      <text x="116" y="149" class="metricSm">6</text>
+    </g>
+  </g>
+
+  <g transform="translate(42,392)">
+    <rect x="0" y="0" width="1740" height="92" rx="16" fill="#0b1320" stroke="#162437"/>
+    <text x="18" y="24" class="small">EMA only</text>
+    <text x="18" y="48" class="note">Row 1: EMA short + EMA long</text>
+    <text x="18" y="66" class="note">Row 2: Spread + Stack</text>
+    <text x="18" y="84" class="note">Row 3: Δ Spread + Δ %</text>
+  </g>
+</svg>

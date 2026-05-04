@@ -1,0 +1,244 @@
+{
+  "asset_timeframe_breakdown": {
+    "BTCUSDT|5m": {
+      "row_count": 6,
+      "state_distribution": {
+        "BULL_EXPANSION": 2,
+        "COMPRESSION": 2,
+        "TRANSITION": 2
+      },
+      "symbol": "BTCUSDT",
+      "timeframe": "5m"
+    }
+  },
+  "baseline_comparison": {
+    "1": {
+      "baseline_model": {
+        "coverage": 0.8333333333333334,
+        "hit_rate": 0.2,
+        "mean_signed_return": -0.008132182579041958,
+        "sample_count": 5
+      },
+      "market_model": {
+        "coverage": 0.6666666666666666,
+        "hit_rate": 0.25,
+        "mean_signed_return": -0.006915228223802472,
+        "sample_count": 4
+      }
+    },
+    "3": {
+      "baseline_model": {
+        "coverage": 0.5,
+        "hit_rate": 0.3333333333333333,
+        "mean_signed_return": -0.00036175753191477106,
+        "sample_count": 3
+      },
+      "market_model": {
+        "coverage": 0.3333333333333333,
+        "hit_rate": 0.5,
+        "mean_signed_return": 0.00195736370212779,
+        "sample_count": 2
+      }
+    },
+    "5": {
+      "baseline_model": {
+        "coverage": 0.16666666666666666,
+        "hit_rate": 0.0,
+        "mean_signed_return": -0.02499999999999991,
+        "sample_count": 1
+      },
+      "market_model": {
+        "coverage": 0.0,
+        "hit_rate": 0.0,
+        "mean_signed_return": 0.0,
+        "sample_count": 0
+      }
+    }
+  },
+  "persistence": {
+    "BULL_EXPANSION": {
+      "avg_run_length": 2.0,
+      "flip_rate_global": 0.6,
+      "max_run_length": 2,
+      "median_run_length": 2.0,
+      "runs": 1,
+      "state": "BULL_EXPANSION"
+    },
+    "COMPRESSION": {
+      "avg_run_length": 1.0,
+      "flip_rate_global": 0.6,
+      "max_run_length": 1,
+      "median_run_length": 1.0,
+      "runs": 2,
+      "state": "COMPRESSION"
+    },
+    "TRANSITION": {
+      "avg_run_length": 2.0,
+      "flip_rate_global": 0.6,
+      "max_run_length": 2,
+      "median_run_length": 2.0,
+      "runs": 1,
+      "state": "TRANSITION"
+    }
+  },
+  "row_count": 6,
+  "state_statistics": {
+    "BULL_EXPANSION": {
+      "horizons": {
+        "1": {
+          "avg_mae": -0.003917151684292741,
+          "avg_mfe": -0.003917151684292741,
+          "count": 2,
+          "hit_rate": 0.5,
+          "mean_return": -0.003917151684292741,
+          "median_return": -0.003917151684292741,
+          "variance": 7.837535828793561e-05
+        },
+        "3": {
+          "avg_mae": -0.010333736087056844,
+          "avg_mfe": 0.005906031026905678,
+          "count": 2,
+          "hit_rate": 0.5,
+          "mean_return": 0.00195736370212779,
+          "median_return": 0.00195736370212779,
+          "variance": 2.419522497584897e-05
+        },
+        "5": {
+          "avg_mae": 0.0,
+          "avg_mfe": 0.0,
+          "count": 0,
+          "hit_rate": 0.0,
+          "mean_return": 0.0,
+          "median_return": 0.0,
+          "variance": 0.0
+        }
+      },
+      "sample_count": 2,
+      "state": "BULL_EXPANSION"
+    },
+    "COMPRESSION": {
+      "horizons": {
+        "1": {
+          "avg_mae": 0.0129999999999999,
+          "avg_mfe": 0.0129999999999999,
+          "count": 1,
+          "hit_rate": 1.0,
+          "mean_return": 0.0129999999999999,
+          "median_return": 0.0129999999999999,
+          "variance": 0.0
+        },
+        "3": {
+          "avg_mae": 0.004999999999999893,
+          "avg_mfe": 0.018000000000000016,
+          "count": 1,
+          "hit_rate": 1.0,
+          "mean_return": 0.004999999999999893,
+          "median_return": 0.004999999999999893,
+          "variance": 0.0
+        },
+        "5": {
+          "avg_mae": 0.004999999999999893,
+          "avg_mfe": 0.02499999999999991,
+          "count": 1,
+          "hit_rate": 1.0,
+          "mean_return": 0.02499999999999991,
+          "median_return": 0.02499999999999991,
+          "variance": 0.0
+        }
+      },
+      "sample_count": 2,
+      "state": "COMPRESSION"
+    },
+    "TRANSITION": {
+      "horizons": {
+        "1": {
+          "avg_mae": 0.009913304763312203,
+          "avg_mfe": 0.009913304763312203,
+          "count": 2,
+          "hit_rate": 1.0,
+          "mean_return": 0.009913304763312203,
+          "median_return": 0.009913304763312203,
+          "variance": 2.4385625516800308e-05
+        },
+        "3": {
+          "avg_mae": 0.0,
+          "avg_mfe": 0.0,
+          "count": 0,
+          "hit_rate": 0.0,
+          "mean_return": 0.0,
+          "median_return": 0.0,
+          "variance": 0.0
+        },
+        "5": {
+          "avg_mae": 0.0,
+          "avg_mfe": 0.0,
+          "count": 0,
+          "hit_rate": 0.0,
+          "mean_return": 0.0,
+          "median_return": 0.0,
+          "variance": 0.0
+        }
+      },
+      "sample_count": 2,
+      "state": "TRANSITION"
+    }
+  },
+  "threshold_sensitivity": {
+    "default": {
+      "flip_rate": 0.6,
+      "row_count": 6,
+      "state_distribution": {
+        "BULL_EXPANSION": 2,
+        "COMPRESSION": 2,
+        "TRANSITION": 2
+      },
+      "thresholds": {}
+    },
+    "strict": {
+      "flip_rate": 0.6,
+      "row_count": 6,
+      "state_distribution": {
+        "BULL_EXPANSION": 2,
+        "COMPRESSION": 2,
+        "TRANSITION": 2
+      },
+      "thresholds": {
+        "direction_long_min": 6,
+        "direction_short_max": -6
+      }
+    }
+  },
+  "transition_matrix": {
+    "BULL_EXPANSION": {
+      "count": 2,
+      "probabilities": {
+        "BULL_EXPANSION": 0.5,
+        "TRANSITION": 0.5
+      },
+      "transitions": {
+        "BULL_EXPANSION": 1,
+        "TRANSITION": 1
+      }
+    },
+    "COMPRESSION": {
+      "count": 1,
+      "probabilities": {
+        "BULL_EXPANSION": 1.0
+      },
+      "transitions": {
+        "BULL_EXPANSION": 1
+      }
+    },
+    "TRANSITION": {
+      "count": 2,
+      "probabilities": {
+        "COMPRESSION": 0.5,
+        "TRANSITION": 0.5
+      },
+      "transitions": {
+        "COMPRESSION": 1,
+        "TRANSITION": 1
+      }
+    }
+  }
+}

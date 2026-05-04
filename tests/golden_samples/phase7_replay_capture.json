@@ -1,0 +1,36 @@
+[
+  {
+    "market": {
+      "market_bias": "LONG",
+      "market_breakout_confirmation": 0.68,
+      "market_confidence": 74,
+      "market_phase": "EXPANSION",
+      "market_state": "BULL_EXPANSION"
+    },
+    "orderflow": {
+      "of_confirmation_allowed": true,
+      "of_data_confidence": 100,
+      "of_data_quality": "GOOD",
+      "of_dom_confidence": 100,
+      "of_dom_depth_age_ms": 120,
+      "of_dom_local_book_synced": true,
+      "of_dom_partial_connected": true,
+      "of_dom_quality": "GOOD",
+      "of_dom_resync_required": false,
+      "of_dom_snapshot_age_ms": 180,
+      "of_dom_source": "LOCAL_L2",
+      "of_dom_sync_state": "SYNCED",
+      "of_last_trade_ts_ms": 1000,
+      "of_tape_confidence": 100,
+      "of_tape_quality": "GOOD",
+      "of_watch_allowed": true,
+      "orderflow_status": "ok",
+      "orderflow_status_reason": ""
+    },
+    "price": null,
+    "runtime": "live",
+    "symbol": "BTCUSDT",
+    "timeframe": "5m",
+    "ts_ms": 1200
+  }
+]

@@ -1,0 +1,9 @@
+# Trade Inspector runtime (Python 3.10+). Install: pip install -r requirements.txt
+numpy>=1.26,<3
+pandas>=2.0,<3
+requests>=2.28,<3
+matplotlib>=3.7,<4
+websocket-client>=1.6,<2
+websockets>=12,<16
+# Faster kline / indicator disk cache (parquet). App falls back to CSV if missing.
+pyarrow>=14.0

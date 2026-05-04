@@ -1,0 +1,126 @@
+<svg width="1600" height="760" viewBox="0 0 1600 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="120" y1="60" x2="1480" y2="700" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0C1625"/>
+      <stop offset="1" stop-color="#09111B"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="180" y1="140" x2="1420" y2="620" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#122235" stop-opacity="0.98"/>
+      <stop offset="1" stop-color="#0C1623" stop-opacity="0.98"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#7AE5D4"/>
+      <stop offset="1" stop-color="#57B8FF"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="1600" height="760" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#000000" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="760" fill="#050B13"/>
+  <rect x="40" y="40" width="1520" height="680" rx="28" fill="url(#bg)"/>
+
+  <g filter="url(#shadow)">
+    <rect x="88" y="98" width="1424" height="544" rx="24" fill="url(#panel)" stroke="rgba(255,255,255,0.08)"/>
+  </g>
+
+  <text x="118" y="136" fill="#7AA6C8" font-size="13" font-family="Segoe UI, Arial, sans-serif" letter-spacing="1.8">LIVE CONTROL SURFACE</text>
+  <text x="118" y="166" fill="#EEF6FF" font-size="28" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Indicator Strip Layout Mockup</text>
+  <text x="118" y="194" fill="#8EA6BC" font-size="16" font-family="Segoe UI, Arial, sans-serif">Four semantic blocks. Big cards for primary states, small badges for secondary metrics.</text>
+
+  <g>
+    <rect x="118" y="222" width="54" height="30" rx="15" fill="#132637" stroke="#274863"/>
+    <text x="145" y="242" text-anchor="middle" fill="#8ED9CB" font-size="13" font-family="Segoe UI, Arial, sans-serif">1m</text>
+    <rect x="182" y="222" width="54" height="30" rx="15" fill="#101B28" stroke="#203446"/>
+    <text x="209" y="242" text-anchor="middle" fill="#89A3BC" font-size="13" font-family="Segoe UI, Arial, sans-serif">5m</text>
+    <rect x="246" y="222" width="62" height="30" rx="15" fill="#101B28" stroke="#203446"/>
+    <text x="277" y="242" text-anchor="middle" fill="#89A3BC" font-size="13" font-family="Segoe UI, Arial, sans-serif">15m</text>
+    <rect x="1212" y="218" width="118" height="36" rx="18" fill="#0E1C2A" stroke="#27445A"/>
+    <text x="1271" y="241" text-anchor="middle" fill="#D9EFFF" font-size="14" font-family="Segoe UI, Arial, sans-serif">EMA 9/21</text>
+    <rect x="1340" y="218" width="78" height="36" rx="18" fill="#0F2230" stroke="#2B5862"/>
+    <circle cx="1360" cy="236" r="6" fill="#79E4D2"/>
+    <text x="1390" y="241" text-anchor="middle" fill="#DFFCF6" font-size="14" font-family="Segoe UI, Arial, sans-serif">Live</text>
+    <rect x="1428" y="218" width="84" height="36" rx="18" fill="#101A29" stroke="#263B50"/>
+    <text x="1470" y="241" text-anchor="middle" fill="#B9CADB" font-size="14" font-family="Segoe UI, Arial, sans-serif">Pause</text>
+  </g>
+
+  <g>
+    <rect x="118" y="286" width="316" height="300" rx="22" fill="#0E1B29" stroke="#1E3247"/>
+    <text x="144" y="320" fill="#8ED9CB" font-size="14" font-family="Segoe UI, Arial, sans-serif" letter-spacing="1.2">EMA BLOCK</text>
+    <rect x="144" y="342" width="264" height="62" rx="16" fill="#13283A" stroke="#274B63"/>
+    <text x="164" y="366" fill="#88A2BC" font-size="12" font-family="Segoe UI, Arial, sans-serif">FAST EMA</text>
+    <text x="164" y="390" fill="#F4FAFF" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">EMA 9</text>
+    <text x="372" y="390" text-anchor="end" fill="#F4FAFF" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">66705.4</text>
+
+    <rect x="144" y="418" width="264" height="62" rx="16" fill="#13283A" stroke="#274B63"/>
+    <text x="164" y="442" fill="#88A2BC" font-size="12" font-family="Segoe UI, Arial, sans-serif">SLOW EMA</text>
+    <text x="164" y="466" fill="#F4FAFF" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">EMA 21</text>
+    <text x="372" y="466" text-anchor="end" fill="#F4FAFF" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">66682.7</text>
+
+    <rect x="144" y="494" width="264" height="62" rx="16" fill="#102231" stroke="#244157"/>
+    <text x="164" y="518" fill="#88A2BC" font-size="12" font-family="Segoe UI, Arial, sans-serif">PAIR STATE</text>
+    <text x="164" y="542" fill="#A9FFD6" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">STACK 9/21</text>
+    <text x="372" y="542" text-anchor="end" fill="#A9FFD6" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">BUY</text>
+  </g>
+
+  <g>
+    <rect x="452" y="286" width="316" height="300" rx="22" fill="#0E1B29" stroke="#1E3247"/>
+    <text x="478" y="320" fill="#FFD38A" font-size="14" font-family="Segoe UI, Arial, sans-serif" letter-spacing="1.2">STRENGTH BLOCK</text>
+    <rect x="478" y="342" width="264" height="62" rx="16" fill="#13283A" stroke="#274B63"/>
+    <text x="498" y="366" fill="#88A2BC" font-size="12" font-family="Segoe UI, Arial, sans-serif">ADX</text>
+    <text x="498" y="390" fill="#F4FAFF" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">23.8</text>
+    <rect x="662" y="354" width="80" height="26" rx="13" fill="#111E2B" stroke="#294254"/>
+    <text x="702" y="371" text-anchor="middle" fill="#D7E7F7" font-size="12" font-family="Segoe UI, Arial, sans-serif">ATR 18.4</text>
+
+    <rect x="478" y="418" width="264" height="62" rx="16" fill="#13283A" stroke="#274B63"/>
+    <text x="498" y="442" fill="#88A2BC" font-size="12" font-family="Segoe UI, Arial, sans-serif">DI+</text>
+    <text x="498" y="466" fill="#A9FFD6" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">24.1</text>
+
+    <rect x="478" y="494" width="264" height="62" rx="16" fill="#13283A" stroke="#274B63"/>
+    <text x="498" y="518" fill="#88A2BC" font-size="12" font-family="Segoe UI, Arial, sans-serif">DI-</text>
+    <text x="498" y="542" fill="#FFD3D3" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">14.9</text>
+  </g>
+
+  <g>
+    <rect x="786" y="286" width="316" height="300" rx="22" fill="#0E1B29" stroke="#1E3247"/>
+    <text x="812" y="320" fill="#A4C8FF" font-size="14" font-family="Segoe UI, Arial, sans-serif" letter-spacing="1.2">REGIME BLOCK</text>
+    <rect x="812" y="342" width="264" height="62" rx="16" fill="#13283A" stroke="#274B63"/>
+    <text x="832" y="366" fill="#88A2BC" font-size="12" font-family="Segoe UI, Arial, sans-serif">FRAMA</text>
+    <text x="832" y="390" fill="#FFE29A" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">NEUTRAL</text>
+
+    <rect x="812" y="418" width="264" height="62" rx="16" fill="#13283A" stroke="#274B63"/>
+    <text x="832" y="442" fill="#88A2BC" font-size="12" font-family="Segoe UI, Arial, sans-serif">VIDYA</text>
+    <text x="832" y="466" fill="#A9FFD6" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">BUY</text>
+
+    <rect x="812" y="494" width="264" height="62" rx="16" fill="#13283A" stroke="#274B63"/>
+    <text x="832" y="518" fill="#88A2BC" font-size="12" font-family="Segoe UI, Arial, sans-serif">RANGE</text>
+    <text x="832" y="542" fill="#FFD3D3" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">SELL</text>
+  </g>
+
+  <g>
+    <rect x="1120" y="286" width="366" height="300" rx="22" fill="#0E1B29" stroke="#1E3247"/>
+    <text x="1146" y="320" fill="#FF8EB8" font-size="14" font-family="Segoe UI, Arial, sans-serif" letter-spacing="1.2">MACD BLOCK</text>
+
+    <rect x="1146" y="342" width="314" height="62" rx="16" fill="#13283A" stroke="#274B63"/>
+    <text x="1166" y="366" fill="#88A2BC" font-size="12" font-family="Segoe UI, Arial, sans-serif">MACD</text>
+    <text x="1166" y="390" fill="#F4FAFF" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">-145.6</text>
+    <rect x="1368" y="354" width="92" height="26" rx="13" fill="#111E2B" stroke="#294254"/>
+    <text x="1414" y="371" text-anchor="middle" fill="#D7E7F7" font-size="12" font-family="Segoe UI, Arial, sans-serif">ANGLE RED</text>
+
+    <rect x="1146" y="418" width="314" height="62" rx="16" fill="#13283A" stroke="#274B63"/>
+    <text x="1166" y="442" fill="#88A2BC" font-size="12" font-family="Segoe UI, Arial, sans-serif">SIGNAL</text>
+    <text x="1166" y="466" fill="#F4FAFF" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">-179.2</text>
+    <rect x="1342" y="430" width="118" height="26" rx="13" fill="#111E2B" stroke="#294254"/>
+    <text x="1401" y="447" text-anchor="middle" fill="#D7E7F7" font-size="12" font-family="Segoe UI, Arial, sans-serif">SIG ANGLE GREEN</text>
+
+    <rect x="1146" y="494" width="314" height="62" rx="16" fill="#13283A" stroke="#274B63"/>
+    <text x="1166" y="518" fill="#88A2BC" font-size="12" font-family="Segoe UI, Arial, sans-serif">MS</text>
+    <text x="1166" y="542" fill="#A9FFD6" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">GREEN</text>
+    <rect x="1306" y="506" width="72" height="26" rx="13" fill="#111E2B" stroke="#294254"/>
+    <text x="1342" y="523" text-anchor="middle" fill="#D7E7F7" font-size="12" font-family="Segoe UI, Arial, sans-serif">PPO 0.42</text>
+    <rect x="1388" y="506" width="72" height="26" rx="13" fill="#111E2B" stroke="#294254"/>
+    <text x="1424" y="523" text-anchor="middle" fill="#D7E7F7" font-size="12" font-family="Segoe UI, Arial, sans-serif">FLIP 3</text>
+  </g>
+
+  <text x="118" y="680" fill="#7C94AC" font-size="15" font-family="Segoe UI, Arial, sans-serif">Idea: keep the strip readable by treating Angle, SigAngle, PPO, FlipAge and ATR as secondary badges, not full peer cards.</text>
+</svg>

@@ -1,0 +1,179 @@
+<svg width="1600" height="980" viewBox="0 0 1600 980" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="980" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#08111E"/>
+      <stop offset="1" stop-color="#111C2B"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#122033"/>
+      <stop offset="1" stop-color="#0B1727"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#49C2FF"/>
+      <stop offset="1" stop-color="#80F6C6"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#000000" flood-opacity="0.28"/>
+    </filter>
+    <style>
+      .title { font: 700 30px 'Segoe UI', sans-serif; fill: #F5FAFF; }
+      .label { font: 600 13px 'Segoe UI', sans-serif; fill: #8EA4BE; letter-spacing: 0.08em; }
+      .body { font: 600 18px 'Segoe UI', sans-serif; fill: #F5FAFF; }
+      .small { font: 500 14px 'Segoe UI', sans-serif; fill: #AAC0D8; }
+      .tiny { font: 500 12px 'Segoe UI', sans-serif; fill: #7D93AC; }
+      .chip { font: 700 12px 'Segoe UI', sans-serif; }
+      .mono { font: 600 12px Consolas, monospace; fill: #D9E8F6; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="980" fill="url(#bg)"/>
+
+  <text x="74" y="66" class="title">Classic Market Context UI Mockup</text>
+  <text x="74" y="93" class="small">Compact strip + detail modal + chart audit preview for the new Market State rewrite</text>
+
+  <g filter="url(#shadow)">
+    <rect x="60" y="130" rx="26" ry="26" width="1480" height="280" fill="url(#panel)" stroke="#1D3148"/>
+  </g>
+
+  <text x="92" y="175" class="label">TOP STRIP / ACTIVE TIMEFRAME</text>
+  <text x="92" y="206" class="body">Classic Market Context</text>
+  <text x="310" y="206" class="tiny">1m active • compact view for the currently selected timeframe</text>
+
+  <g>
+    <rect x="1270" y="165" width="48" height="28" rx="14" fill="#123149" stroke="#214A66"/>
+    <text x="1286" y="184" class="chip" fill="#D8F3FF">1m</text>
+    <rect x="1328" y="165" width="48" height="28" rx="14" fill="#0D1827" stroke="#203248"/>
+    <text x="1344" y="184" class="chip" fill="#93A9C2">5m</text>
+    <rect x="1386" y="165" width="54" height="28" rx="14" fill="#0D1827" stroke="#203248"/>
+    <text x="1400" y="184" class="chip" fill="#93A9C2">15m</text>
+    <rect x="1450" y="165" width="54" height="28" rx="14" fill="#0D1827" stroke="#203248"/>
+    <text x="1464" y="184" class="chip" fill="#93A9C2">30m</text>
+  </g>
+
+  <g>
+    <rect x="92" y="232" width="208" height="68" rx="16" fill="#0E1B2C" stroke="#22425F"/>
+    <text x="112" y="255" class="label">TREND</text>
+    <text x="112" y="284" class="body" fill="#87F3BF">UPTREND</text>
+    <text x="112" y="306" class="tiny">Age 17 • confirmed HH/HL structure</text>
+
+    <rect x="316" y="232" width="256" height="68" rx="16" fill="#0E1B2C" stroke="#22425F"/>
+    <text x="336" y="255" class="label">STRUCTURE</text>
+    <text x="336" y="284" class="body" fill="#F5FAFF">HH / HL INTACT</text>
+    <text x="336" y="306" class="tiny">Protected low 66,842 • protected high 67,120</text>
+
+    <rect x="588" y="232" width="230" height="68" rx="16" fill="#0E1B2C" stroke="#22425F"/>
+    <text x="608" y="255" class="label">PHASE</text>
+    <text x="608" y="284" class="body" fill="#80F6C6">EXPANSION</text>
+    <text x="608" y="306" class="tiny">Age 6 • follow-through still clean</text>
+
+    <rect x="834" y="232" width="260" height="68" rx="16" fill="#0E1B2C" stroke="#22425F"/>
+    <text x="854" y="255" class="label">BREAKOUT</text>
+    <text x="854" y="284" class="body" fill="#49C2FF">WATCH LONG</text>
+    <text x="854" y="306" class="tiny">Age 3 • pressing upper base / no failure yet</text>
+
+    <rect x="1110" y="232" width="188" height="68" rx="16" fill="#0E1B2C" stroke="#22425F"/>
+    <text x="1130" y="255" class="label">VOLUME</text>
+    <text x="1130" y="284" class="body" fill="#F7E38A">SUPPORTIVE</text>
+    <text x="1130" y="306" class="tiny">1.24x avg • confirms trend leg</text>
+
+    <rect x="1314" y="232" width="194" height="68" rx="16" fill="#0E1B2C" stroke="#22425F"/>
+    <text x="1334" y="255" class="label">PA PATTERN</text>
+    <text x="1334" y="284" class="body" fill="#F5FAFF">IMPULSE BAR</text>
+    <text x="1334" y="306" class="tiny">Body close high • rejection absent</text>
+  </g>
+
+  <g>
+    <rect x="92" y="320" width="1416" height="58" rx="18" fill="#0C1827" stroke="#1B3046"/>
+    <text x="112" y="344" class="label">WHY / CONTEXT REASONS</text>
+    <text x="112" y="367" class="small">Confirmed HH/HL structure  •  price extending with structure and follow-through  •  watching for bullish range release  •  volume supports the current move</text>
+  </g>
+
+  <g>
+    <rect x="92" y="392" width="220" height="1" fill="#203348"/>
+    <text x="92" y="406" class="tiny">Left click: detail modal</text>
+    <text x="252" y="406" class="tiny">Right click: add rules from current TF</text>
+    <text x="468" y="406" class="tiny">Compact strip should only show headline context, not internal scores</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="60" y="448" rx="26" ry="26" width="960" height="470" fill="url(#panel)" stroke="#1D3148"/>
+  </g>
+  <text x="92" y="492" class="label">DETAIL MODAL / ACTIVE TF</text>
+  <text x="92" y="522" class="body">Market Context • 1m</text>
+  <text x="280" y="522" class="tiny">Designed for manual audit against the chart</text>
+
+  <g>
+    <rect x="92" y="548" width="278" height="110" rx="18" fill="#0E1B2C" stroke="#22425F"/>
+    <text x="112" y="572" class="label">OVERVIEW</text>
+    <text x="112" y="600" class="body">UPTREND • EXPANSION</text>
+    <text x="112" y="625" class="small">Structure: HH / HL intact</text>
+    <text x="112" y="648" class="small">Breakout: Watch Long</text>
+
+    <rect x="386" y="548" width="300" height="110" rx="18" fill="#0E1B2C" stroke="#22425F"/>
+    <text x="406" y="572" class="label">CLASSIC TA</text>
+    <text x="406" y="600" class="small">Higher High: YES   Higher Low: YES</text>
+    <text x="406" y="624" class="small">Lower High: NO    Lower Low: NO</text>
+    <text x="406" y="648" class="small">Inside/Outside: NO / NO</text>
+
+    <rect x="702" y="548" width="286" height="110" rx="18" fill="#0E1B2C" stroke="#22425F"/>
+    <text x="722" y="572" class="label">PROTECTED LEVELS</text>
+    <text x="722" y="600" class="small">Protected High: 67,120</text>
+    <text x="722" y="624" class="small">Protected Low: 66,842</text>
+    <text x="722" y="648" class="small">Base Top/Bottom: 67,110 / 66,910</text>
+  </g>
+
+  <g>
+    <rect x="92" y="678" width="440" height="100" rx="18" fill="#0E1B2C" stroke="#22425F"/>
+    <text x="112" y="702" class="label">BREAKOUT STATUS</text>
+    <text x="112" y="731" class="body" fill="#49C2FF">WATCH LONG</text>
+    <text x="264" y="731" class="small">Age 3</text>
+    <text x="112" y="754" class="small">Reason: pressing upper base / bullish pressure / no failure yet</text>
+
+    <rect x="548" y="678" width="440" height="100" rx="18" fill="#0E1B2C" stroke="#22425F"/>
+    <text x="568" y="702" class="label">VOLUME + PRICE ACTION</text>
+    <text x="568" y="731" class="small">Volume: SUPPORTIVE  •  1.24x average</text>
+    <text x="568" y="754" class="small">Pattern: impulse bar  •  close near high  •  no upper rejection</text>
+  </g>
+
+  <g>
+    <rect x="92" y="794" width="896" height="94" rx="18" fill="#0E1B2C" stroke="#22425F"/>
+    <text x="112" y="818" class="label">AUDIT REASONS</text>
+    <text x="112" y="844" class="small">1. Trend = UPTREND because confirmed HH/HL structure is active.</text>
+    <text x="112" y="866" class="small">2. Phase = EXPANSION because price is extending with follow-through and the protected higher low is still intact.</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="1048" y="448" rx="26" ry="26" width="492" height="470" fill="url(#panel)" stroke="#1D3148"/>
+  </g>
+  <text x="1080" y="492" class="label">CHART AUDIT PREVIEW</text>
+  <text x="1080" y="522" class="body">Real Data Overlay</text>
+  <text x="1236" y="522" class="tiny">for validation, not for trading decisions alone</text>
+
+  <g>
+    <rect x="1080" y="550" width="428" height="250" rx="18" fill="#08111B" stroke="#203248"/>
+    <path d="M1115 747 C1170 698 1195 706 1232 664 C1268 624 1288 632 1320 596 C1356 554 1398 562 1456 590" stroke="#5BE3B0" stroke-width="4" fill="none"/>
+    <path d="M1115 720 C1162 712 1190 704 1230 706 C1268 708 1298 696 1338 698 C1384 700 1424 690 1476 694" stroke="#4DBBFF" stroke-width="2" fill="none" stroke-dasharray="7 7"/>
+    <circle cx="1232" cy="664" r="6" fill="#F5FAFF"/>
+    <circle cx="1320" cy="596" r="6" fill="#F5FAFF"/>
+    <circle cx="1198" cy="699" r="6" fill="#7BE8B7"/>
+    <circle cx="1282" cy="631" r="6" fill="#7BE8B7"/>
+    <line x1="1460" y1="566" x2="1460" y2="792" stroke="#2B425C" stroke-dasharray="6 6"/>
+    <line x1="1165" y1="632" x2="1492" y2="632" stroke="#F7E38A" stroke-dasharray="6 6"/>
+    <text x="1450" y="560" class="tiny">WATCH LONG</text>
+    <text x="1170" y="626" class="tiny">base top</text>
+    <text x="1188" y="653" class="tiny">HH</text>
+    <text x="1272" y="620" class="tiny">HL</text>
+    <text x="1312" y="586" class="tiny">HH</text>
+  </g>
+
+  <g>
+    <rect x="1080" y="820" width="428" height="68" rx="18" fill="#0E1B2C" stroke="#22425F"/>
+    <text x="1100" y="844" class="label">AUDIT LEGEND</text>
+    <text x="1100" y="869" class="small">HH/HL markers • protected level • base boundaries • phase labels • breakout watch/confirm/fail markers</text>
+  </g>
+
+  <g>
+    <rect x="1080" y="896" width="428" height="22" rx="11" fill="#0C1827" stroke="#1B3046"/>
+    <text x="1100" y="911" class="tiny">Idea: UI should stay simple, but every state must be auditable on the chart with clear reasons.</text>
+  </g>
+</svg>

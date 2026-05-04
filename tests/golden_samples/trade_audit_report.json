@@ -1,0 +1,227 @@
+{
+  "report_type": "trade_audit",
+  "report_version": 1,
+  "start": "2026-01-01T00:00:00+00:00",
+  "end": "2026-01-01T01:00:00+00:00",
+  "run_summary": {
+    "symbol": "BTCUSDT"
+  },
+  "threshold_pack": {
+    "backtest_config": {
+      "initial_balance": 1000.0,
+      "order_notional_usdt": 100.0,
+      "fee_rate": 0.0004,
+      "slippage_bps": 0.0,
+      "stop_loss_pct": 0.0,
+      "take_profit_pct": 0.0,
+      "stop_loss_mode": "PERCENT",
+      "stop_loss_value": 0.0,
+      "stop_loss_timeframe": "1m",
+      "stop_loss_field": "",
+      "stop_loss_offset_pct": 0.0,
+      "take_profit_mode": "PERCENT",
+      "take_profit_value": 0.0,
+      "take_profit_timeframe": "1m",
+      "take_profit_field": "",
+      "take_profit_offset_pct": 0.0,
+      "allow_reverse": true,
+      "skip_if_both_entries": true,
+      "step_timeframe": "1m"
+    },
+    "market_state_thresholds": {
+      "vidya_angle_up_deg": 2.0,
+      "vidya_angle_down_deg": -2.0,
+      "vidya_angle_strong_deg": 8.0,
+      "vidya_delta_support_pct": 15.0,
+      "vidya_delta_weak_pct": 5.0,
+      "direction_long_min": 4,
+      "direction_short_max": -4,
+      "compression_direction_abs_max": 2,
+      "compression_macd_gap_norm_max": 0.35,
+      "confidence_base": 18,
+      "expansion_confirmation_min": 0.56,
+      "expansion_pullback_floor": 40.0,
+      "expansion_exhaustion_cap": 48.0,
+      "expansion_max_weakness_score": 1.25
+    }
+  },
+  "trade_count": 1,
+  "trades": [
+    {
+      "trade_id": 1,
+      "side": "LONG",
+      "entry_time": "2026-01-01T00:00:00+00:00",
+      "exit_time": "2026-01-01T00:10:00+00:00",
+      "signal_time": null,
+      "order_created_time": null,
+      "entry_fill_time": null,
+      "exit_signal_time": null,
+      "exit_order_created_time": null,
+      "exit_fill_time": null,
+      "entry_price": 100.0,
+      "exit_price": 101.0,
+      "qty": 1.0,
+      "entry_notional": 100.0,
+      "exit_notional": 101.0,
+      "gross_pnl": 1.0,
+      "fees": 0.1,
+      "fee_entry": 0.0,
+      "fee_exit": 0.0,
+      "net_pnl": 0.9,
+      "return_pct": 0.9,
+      "duration_min": 10,
+      "mfe": 1.2,
+      "mae": -0.2,
+      "mfe_pct": 1.2,
+      "mae_pct": -0.2,
+      "engine_type": "",
+      "fill_source": "",
+      "ambiguous_exit": false,
+      "stop_loss_price": null,
+      "take_profit_price": null,
+      "entry_reason": "Long Entry",
+      "exit_reason": "Long Exit",
+      "entry_barsago": {},
+      "exit_barsago": {},
+      "entry_rule_audit": {
+        "tab": "Long Entry",
+        "result": true,
+        "groups_join": "AND",
+        "groups": [
+          {
+            "group_index": 1,
+            "join_mode": "AND",
+            "result": true,
+            "rules": [
+              {
+                "group_index": 1,
+                "rule_index": 1,
+                "result": true,
+                "is_trigger": true,
+                "label": "1m market_breakout_confirmation >= 0.6",
+                "detail_text": "      cur=0.71 | 0.71 >= 0.6 -> True"
+              }
+            ]
+          }
+        ],
+        "tf_snapshots": {},
+        "raw_text": "Tab: Long Entry | Result: TRUE | GroupJoin: AND\nGroup 1: Join=AND | Result=TRUE\n  1.1 TRUE [TRIGGER] :: 1m market_breakout_confirmation >= 0.6\n      cur=0.71 | 0.71 >= 0.6 -> True\n",
+        "stats": {
+          "groups": 1,
+          "rules_passed": 1,
+          "rules_failed": 0,
+          "trigger_rules": 1
+        }
+      },
+      "exit_rule_audit": {
+        "tab": "Long Exit",
+        "result": true,
+        "groups_join": "OR",
+        "groups": [
+          {
+            "group_index": 1,
+            "join_mode": "OR",
+            "result": true,
+            "rules": [
+              {
+                "group_index": 1,
+                "rule_index": 1,
+                "result": true,
+                "is_trigger": false,
+                "label": "1m trend_broken == True",
+                "detail_text": "      cur=True | True == True -> True"
+              }
+            ]
+          }
+        ],
+        "tf_snapshots": {},
+        "raw_text": "Tab: Long Exit | Result: TRUE | GroupJoin: OR\nGroup 1: Join=OR | Result=TRUE\n  1.1 TRUE :: 1m trend_broken == True\n      cur=True | True == True -> True\n",
+        "stats": {
+          "groups": 1,
+          "rules_passed": 1,
+          "rules_failed": 0,
+          "trigger_rules": 0
+        }
+      },
+      "entry_market_context": {
+        "1m": {
+          "market_state": "BREAKOUT_CONFIRM_LONG",
+          "market_phase": "EXPANSION",
+          "market_bias": null,
+          "market_confidence": null,
+          "market_compression_maturity": null,
+          "market_breakout_readiness": 0.68,
+          "market_breakout_confirmation": 0.71,
+          "market_breakout_quality": null,
+          "market_breakout_fail_rate": null,
+          "market_pressure_bias": null,
+          "market_delta_strength": null,
+          "market_volume_support": null,
+          "market_direction_evidence": null,
+          "vwap_relation": null
+        }
+      },
+      "exit_market_context": {
+        "1m": {
+          "market_state": "BULL_EXHAUSTION",
+          "market_phase": "EXHAUSTION",
+          "market_bias": null,
+          "market_confidence": null,
+          "market_compression_maturity": null,
+          "market_breakout_readiness": null,
+          "market_breakout_confirmation": null,
+          "market_breakout_quality": null,
+          "market_breakout_fail_rate": null,
+          "market_pressure_bias": null,
+          "market_delta_strength": null,
+          "market_volume_support": null,
+          "market_direction_evidence": null,
+          "vwap_relation": null
+        }
+      },
+      "threshold_pack": {
+        "backtest_config": {
+          "initial_balance": 1000.0,
+          "order_notional_usdt": 100.0,
+          "fee_rate": 0.0004,
+          "slippage_bps": 0.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.0,
+          "stop_loss_mode": "PERCENT",
+          "stop_loss_value": 0.0,
+          "stop_loss_timeframe": "1m",
+          "stop_loss_field": "",
+          "stop_loss_offset_pct": 0.0,
+          "take_profit_mode": "PERCENT",
+          "take_profit_value": 0.0,
+          "take_profit_timeframe": "1m",
+          "take_profit_field": "",
+          "take_profit_offset_pct": 0.0,
+          "allow_reverse": true,
+          "skip_if_both_entries": true,
+          "step_timeframe": "1m"
+        },
+        "market_state_thresholds": {
+          "vidya_angle_up_deg": 2.0,
+          "vidya_angle_down_deg": -2.0,
+          "vidya_angle_strong_deg": 8.0,
+          "vidya_delta_support_pct": 15.0,
+          "vidya_delta_weak_pct": 5.0,
+          "direction_long_min": 4,
+          "direction_short_max": -4,
+          "compression_direction_abs_max": 2,
+          "compression_macd_gap_norm_max": 0.35,
+          "confidence_base": 18,
+          "expansion_confirmation_min": 0.56,
+          "expansion_pullback_floor": 40.0,
+          "expansion_exhaustion_cap": 48.0,
+          "expansion_max_weakness_score": 1.25
+        }
+      }
+    }
+  ],
+  "source_payload_meta": {
+    "has_result_wrapper": false,
+    "source_keys": []
+  }
+}

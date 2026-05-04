@@ -1,0 +1,14 @@
+{
+  "advisory_rows": 1,
+  "by_mode": {
+    "validated_only": 1,
+    "validated_plus_advisory": 1
+  },
+  "by_runtime": {
+    "backtest": 1,
+    "live": 1
+  },
+  "replay_capture_ready_rows": 1,
+  "row_count": 2,
+  "validated_only_rows": 1
+}

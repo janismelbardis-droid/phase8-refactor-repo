@@ -1,0 +1,131 @@
+<svg width="1600" height="760" viewBox="0 0 1600 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg2" x1="80" y1="40" x2="1520" y2="720" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1524"/>
+      <stop offset="1" stop-color="#07101A"/>
+    </linearGradient>
+    <linearGradient id="panel2" x1="110" y1="110" x2="1490" y2="650" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#112133" stop-opacity="0.98"/>
+      <stop offset="1" stop-color="#0B1622" stop-opacity="0.98"/>
+    </linearGradient>
+    <filter id="shadow2" x="0" y="0" width="1600" height="760" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="760" fill="#040912"/>
+  <rect x="36" y="36" width="1528" height="688" rx="30" fill="url(#bg2)"/>
+
+  <g filter="url(#shadow2)">
+    <rect x="84" y="92" width="1432" height="564" rx="24" fill="url(#panel2)" stroke="#1C3044"/>
+  </g>
+
+  <text x="116" y="130" fill="#7695B1" font-size="13" font-family="Segoe UI, Arial, sans-serif" letter-spacing="1.8">LIVE CONTROL SURFACE</text>
+  <text x="116" y="162" fill="#F1F7FD" font-size="29" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Indicator Strip Layout Mockup v2</text>
+  <text x="116" y="190" fill="#8CA4BA" font-size="16" font-family="Segoe UI, Arial, sans-serif">EMA shows angle states, center row shows EMA delta, regime cards carry age / delta-volume side badges.</text>
+
+  <g>
+    <rect x="116" y="220" width="54" height="30" rx="15" fill="#14283A" stroke="#2D4D67"/>
+    <text x="143" y="240" text-anchor="middle" fill="#8FE0D1" font-size="13" font-family="Segoe UI, Arial, sans-serif">1m</text>
+    <rect x="180" y="220" width="54" height="30" rx="15" fill="#101B28" stroke="#22374A"/>
+    <text x="207" y="240" text-anchor="middle" fill="#8AA3BC" font-size="13" font-family="Segoe UI, Arial, sans-serif">5m</text>
+    <rect x="244" y="220" width="62" height="30" rx="15" fill="#101B28" stroke="#22374A"/>
+    <text x="275" y="240" text-anchor="middle" fill="#8AA3BC" font-size="13" font-family="Segoe UI, Arial, sans-serif">15m</text>
+    <rect x="1200" y="216" width="124" height="36" rx="18" fill="#0E1C2A" stroke="#29445C"/>
+    <text x="1262" y="239" text-anchor="middle" fill="#D7EEFF" font-size="14" font-family="Segoe UI, Arial, sans-serif">EMA 9/21</text>
+    <rect x="1334" y="216" width="78" height="36" rx="18" fill="#0F2230" stroke="#2B5A65"/>
+    <circle cx="1355" cy="234" r="6" fill="#79E4D2"/>
+    <text x="1375" y="239" fill="#DCF9F2" font-size="14" font-family="Segoe UI, Arial, sans-serif">Live</text>
+    <rect x="1422" y="216" width="88" height="36" rx="18" fill="#111A28" stroke="#263A50"/>
+    <text x="1466" y="239" text-anchor="middle" fill="#B9CBDC" font-size="14" font-family="Segoe UI, Arial, sans-serif">Pause</text>
+  </g>
+
+  <g>
+    <rect x="116" y="284" width="318" height="312" rx="22" fill="#0E1B29" stroke="#1C3247"/>
+    <text x="142" y="318" fill="#8FE0D1" font-size="14" font-family="Segoe UI, Arial, sans-serif" letter-spacing="1.2">EMA BLOCK</text>
+
+    <rect x="142" y="340" width="266" height="64" rx="16" fill="#13283A" stroke="#274B63"/>
+    <text x="162" y="365" fill="#89A4BE" font-size="12" font-family="Segoe UI, Arial, sans-serif">EMA 9</text>
+    <text x="162" y="390" fill="#A8FFD5" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">ANGLE UP</text>
+    <rect x="327" y="352" width="81" height="26" rx="13" fill="#0F1B28" stroke="#294255"/>
+    <text x="367.5" y="369" text-anchor="middle" fill="#D4E6F5" font-size="12" font-family="Segoe UI, Arial, sans-serif">Slope +</text>
+
+    <rect x="142" y="418" width="266" height="64" rx="16" fill="#13283A" stroke="#274B63"/>
+    <text x="162" y="443" fill="#89A4BE" font-size="12" font-family="Segoe UI, Arial, sans-serif">EMA 21</text>
+    <text x="162" y="468" fill="#A8FFD5" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">ANGLE UP</text>
+    <rect x="327" y="430" width="81" height="26" rx="13" fill="#0F1B28" stroke="#294255"/>
+    <text x="367.5" y="447" text-anchor="middle" fill="#D4E6F5" font-size="12" font-family="Segoe UI, Arial, sans-serif">Slope +</text>
+
+    <rect x="142" y="496" width="266" height="64" rx="16" fill="#102231" stroke="#244257"/>
+    <text x="162" y="521" fill="#89A4BE" font-size="12" font-family="Segoe UI, Arial, sans-serif">EMA DELTA</text>
+    <text x="162" y="546" fill="#A8FFD5" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">+22.7</text>
+    <text x="380" y="546" text-anchor="end" fill="#A8FFD5" font-size="18" font-family="Segoe UI, Arial, sans-serif" font-weight="700">9 - 21</text>
+  </g>
+
+  <g>
+    <rect x="452" y="284" width="304" height="312" rx="22" fill="#0E1B29" stroke="#1C3247"/>
+    <text x="478" y="318" fill="#FFD28A" font-size="14" font-family="Segoe UI, Arial, sans-serif" letter-spacing="1.2">STRENGTH BLOCK</text>
+
+    <rect x="478" y="340" width="252" height="64" rx="16" fill="#13283A" stroke="#274B63"/>
+    <text x="498" y="365" fill="#89A4BE" font-size="12" font-family="Segoe UI, Arial, sans-serif">ADX</text>
+    <text x="498" y="390" fill="#F2F8FF" font-size="25" font-family="Segoe UI, Arial, sans-serif" font-weight="700">23.8</text>
+
+    <rect x="478" y="418" width="252" height="64" rx="16" fill="#13283A" stroke="#274B63"/>
+    <text x="498" y="443" fill="#89A4BE" font-size="12" font-family="Segoe UI, Arial, sans-serif">DI+</text>
+    <text x="498" y="468" fill="#A8FFD5" font-size="25" font-family="Segoe UI, Arial, sans-serif" font-weight="700">24.1</text>
+
+    <rect x="478" y="496" width="252" height="64" rx="16" fill="#13283A" stroke="#274B63"/>
+    <text x="498" y="521" fill="#89A4BE" font-size="12" font-family="Segoe UI, Arial, sans-serif">DI-</text>
+    <text x="498" y="546" fill="#FFB6C8" font-size="25" font-family="Segoe UI, Arial, sans-serif" font-weight="700">14.9</text>
+  </g>
+
+  <g>
+    <rect x="774" y="284" width="332" height="312" rx="22" fill="#0E1B29" stroke="#1C3247"/>
+    <text x="800" y="318" fill="#A7C8FF" font-size="14" font-family="Segoe UI, Arial, sans-serif" letter-spacing="1.2">REGIME BLOCK</text>
+
+    <rect x="800" y="340" width="280" height="64" rx="16" fill="#13283A" stroke="#274B63"/>
+    <text x="820" y="365" fill="#89A4BE" font-size="12" font-family="Segoe UI, Arial, sans-serif">FRAMA</text>
+    <text x="820" y="390" fill="#F2F5F8" font-size="25" font-family="Segoe UI, Arial, sans-serif" font-weight="700">NEUTRAL</text>
+    <rect x="987" y="352" width="93" height="26" rx="13" fill="#0F1B28" stroke="#294255"/>
+    <text x="1033.5" y="369" text-anchor="middle" fill="#D4E6F5" font-size="12" font-family="Segoe UI, Arial, sans-serif">Age 2 bars</text>
+
+    <rect x="800" y="418" width="280" height="64" rx="16" fill="#13283A" stroke="#274B63"/>
+    <text x="820" y="443" fill="#89A4BE" font-size="12" font-family="Segoe UI, Arial, sans-serif">VIDYA</text>
+    <text x="820" y="468" fill="#A8FFD5" font-size="25" font-family="Segoe UI, Arial, sans-serif" font-weight="700">BUY</text>
+    <rect x="971" y="430" width="109" height="26" rx="13" fill="#0F1B28" stroke="#294255"/>
+    <text x="1025.5" y="447" text-anchor="middle" fill="#D4E6F5" font-size="12" font-family="Segoe UI, Arial, sans-serif">Δ Vol +18%</text>
+
+    <rect x="800" y="496" width="280" height="64" rx="16" fill="#13283A" stroke="#274B63"/>
+    <text x="820" y="521" fill="#89A4BE" font-size="12" font-family="Segoe UI, Arial, sans-serif">RANGE</text>
+    <text x="820" y="546" fill="#FFB6C8" font-size="25" font-family="Segoe UI, Arial, sans-serif" font-weight="700">SELL</text>
+    <rect x="987" y="508" width="93" height="26" rx="13" fill="#0F1B28" stroke="#294255"/>
+    <text x="1033.5" y="525" text-anchor="middle" fill="#D4E6F5" font-size="12" font-family="Segoe UI, Arial, sans-serif">Age 1 bar</text>
+  </g>
+
+  <g>
+    <rect x="1124" y="284" width="366" height="312" rx="22" fill="#0E1B29" stroke="#1C3247"/>
+    <text x="1150" y="318" fill="#FF90B8" font-size="14" font-family="Segoe UI, Arial, sans-serif" letter-spacing="1.2">MACD BLOCK</text>
+
+    <rect x="1150" y="340" width="314" height="64" rx="16" fill="#13283A" stroke="#274B63"/>
+    <text x="1170" y="365" fill="#89A4BE" font-size="12" font-family="Segoe UI, Arial, sans-serif">MACD</text>
+    <text x="1170" y="390" fill="#FFB6C8" font-size="25" font-family="Segoe UI, Arial, sans-serif" font-weight="700">-145.6</text>
+    <rect x="1371" y="352" width="93" height="26" rx="13" fill="#0F1B28" stroke="#294255"/>
+    <text x="1417.5" y="369" text-anchor="middle" fill="#D4E6F5" font-size="12" font-family="Segoe UI, Arial, sans-serif">Angle RED</text>
+
+    <rect x="1150" y="418" width="314" height="64" rx="16" fill="#13283A" stroke="#274B63"/>
+    <text x="1170" y="443" fill="#89A4BE" font-size="12" font-family="Segoe UI, Arial, sans-serif">SIGNAL</text>
+    <text x="1170" y="468" fill="#FFB6C8" font-size="25" font-family="Segoe UI, Arial, sans-serif" font-weight="700">-179.2</text>
+    <rect x="1345" y="430" width="119" height="26" rx="13" fill="#0F1B28" stroke="#294255"/>
+    <text x="1404.5" y="447" text-anchor="middle" fill="#D4E6F5" font-size="12" font-family="Segoe UI, Arial, sans-serif">SigAngle GREEN</text>
+
+    <rect x="1150" y="496" width="314" height="64" rx="16" fill="#13283A" stroke="#274B63"/>
+    <text x="1170" y="521" fill="#89A4BE" font-size="12" font-family="Segoe UI, Arial, sans-serif">MS</text>
+    <text x="1170" y="546" fill="#A8FFD5" font-size="25" font-family="Segoe UI, Arial, sans-serif" font-weight="700">GREEN</text>
+    <rect x="1320" y="508" width="72" height="26" rx="13" fill="#0F1B28" stroke="#294255"/>
+    <text x="1356" y="525" text-anchor="middle" fill="#A8FFD5" font-size="12" font-family="Segoe UI, Arial, sans-serif">PPO GREEN</text>
+    <rect x="1402" y="508" width="62" height="26" rx="13" fill="#0F1B28" stroke="#294255"/>
+    <text x="1433" y="525" text-anchor="middle" fill="#D4E6F5" font-size="12" font-family="Segoe UI, Arial, sans-serif">Flip 3</text>
+  </g>
+
+  <text x="116" y="678" fill="#7B93AB" font-size="15" font-family="Segoe UI, Arial, sans-serif">This version follows your latest idea: EMA cards show direction/angle, regime cards show age or delta-volume, MACD numbers are colored by sign, PPO is a small state badge.</text>
+</svg>

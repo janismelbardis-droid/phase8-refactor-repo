@@ -1,0 +1,27 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Test / type / lint caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local build artifacts
+/dist/
+*.zip
+.coverage
+
+# Tick / runtime scratch
+/data_cache/
+/runs/
+
+# OS / editor noise
+.DS_Store
+.vscode/
+.idea/
+
+# Local environments
+/.venv/
+venv/

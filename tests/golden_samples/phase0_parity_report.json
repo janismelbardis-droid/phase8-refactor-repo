@@ -1,0 +1,104 @@
+{
+  "bar_close": {
+    "summary": {
+      "ending_balance": 1000.9852216748768,
+      "net_profit": 0.9852216748768114,
+      "trades": 1,
+      "wins": 1,
+      "losses": 0,
+      "avg_duration_min": 2.0,
+      "engine_type_counts": {
+        "OHLCV": 1
+      },
+      "fill_source_counts": {
+        "BAR_OPEN": 1
+      },
+      "avg_signal_to_entry_sec": 0.001,
+      "avg_order_to_entry_sec": 0.001,
+      "avg_entry_to_exit_sec": 120.0
+    },
+    "trade": {
+      "side": "LONG",
+      "entry_time": "2026-01-01T00:02:00.001000+00:00",
+      "exit_time": "2026-01-01T00:04:00.001000+00:00",
+      "entry_price": 101.5,
+      "exit_price": 102.5,
+      "net_pnl": 0.9852216748768473,
+      "entry_reason": "Long Entry",
+      "exit_reason": "Long Exit",
+      "engine_type": "OHLCV",
+      "fill_source": "BAR_OPEN",
+      "entry_row_index": 3,
+      "exit_row_index": 5
+    },
+    "equity_curve_points": 7
+  },
+  "replay_light": {
+    "summary": {
+      "ending_balance": 1000.9852216748768,
+      "net_profit": 0.9852216748768114,
+      "trades": 1,
+      "wins": 1,
+      "losses": 0,
+      "avg_duration_min": 2.0,
+      "engine_type_counts": {
+        "OHLCV": 1
+      },
+      "fill_source_counts": {
+        "BAR_OPEN": 1
+      },
+      "avg_signal_to_entry_sec": 0.001,
+      "avg_order_to_entry_sec": 0.001,
+      "avg_entry_to_exit_sec": 120.0
+    },
+    "trade": {
+      "side": "LONG",
+      "entry_time": "2026-01-01T00:02:00.001000+00:00",
+      "exit_time": "2026-01-01T00:04:00.001000+00:00",
+      "entry_price": 101.5,
+      "exit_price": 102.5,
+      "net_pnl": 0.9852216748768473,
+      "entry_reason": "Long Entry",
+      "exit_reason": "Long Exit",
+      "engine_type": "OHLCV",
+      "fill_source": "BAR_OPEN",
+      "entry_row_index": 3,
+      "exit_row_index": 5
+    },
+    "equity_curve_points": 2
+  },
+  "tick": {
+    "summary": {
+      "ending_balance": 1000.9896091044037,
+      "net_profit": 0.9896091044037121,
+      "trades": 1,
+      "wins": 1,
+      "losses": 0,
+      "avg_duration_min": 2.0,
+      "engine_type_counts": {
+        "AGGTRADE": 1
+      },
+      "fill_source_counts": {
+        "AGGTRADE": 1
+      },
+      "avg_signal_to_entry_sec": 1.0,
+      "avg_order_to_entry_sec": 1.0,
+      "avg_entry_to_exit_sec": 120.0
+    },
+    "trade": {
+      "side": "LONG",
+      "entry_time": "2026-01-01T00:02:01+00:00",
+      "exit_time": "2026-01-01T00:04:01+00:00",
+      "entry_price": 101.05,
+      "exit_price": 102.05,
+      "net_pnl": 0.9896091044037606,
+      "entry_reason": "Long Entry",
+      "exit_reason": "Long Exit",
+      "engine_type": "AGGTRADE",
+      "fill_source": "AGGTRADE",
+      "entry_row_index": null,
+      "exit_row_index": null
+    },
+    "equity_curve_points": 7
+  }
+}

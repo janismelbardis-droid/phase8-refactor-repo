@@ -1,0 +1,675 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Trade Inspector V2</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar" id="sidebar-drawer">
+        <div class="brand">
+          <div class="brand-mark">TI</div>
+          <div>
+            <div class="eyebrow">Local Workstation</div>
+            <h1>Trade Inspector V2</h1>
+          </div>
+        </div>
+        <nav class="nav">
+          <button class="nav-link is-active" data-view="overview">Overview</button>
+          <button class="nav-link" data-view="presets">Presets</button>
+          <button class="nav-link" data-view="builder">Rule Builder</button>
+          <button class="nav-link" data-view="backtest">Backtest</button>
+          <button class="nav-link" data-view="downloader">Downloader</button>
+        </nav>
+        <div class="sidebar-card">
+          <p class="eyebrow">Design Direction</p>
+          <p class="muted">
+            Modern local web UI, lazy sections, background jobs, and the same Python engine behind it.
+          </p>
+        </div>
+      </aside>
+      <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+      <main class="content">
+        <header class="topbar">
+          <div class="topbar-main">
+            <button class="icon-button" id="nav-toggle-button" type="button" aria-label="Toggle navigation">&#9776;</button>
+            <div>
+              <p class="eyebrow">Modern Dark Rebuild</p>
+              <h2 id="view-title">Overview</h2>
+            </div>
+          </div>
+          <div class="status-cluster">
+            <span class="status-pill" id="health-pill">Checking backend...</span>
+            <span class="status-pill subtle" id="job-pill">No jobs running</span>
+          </div>
+        </header>
+
+        <section class="view is-active" id="overview-view">
+          <div class="hero">
+            <div>
+              <p class="eyebrow">Why This Exists</p>
+              <h3>Built to replace the old Tk shell, not repaint it.</h3>
+              <p class="muted">
+                The backtest engine, indicators, presets, and caches stay in Python. The interface becomes a local web
+                app with smoother resizing, dark styling, lazy rendering, and background job execution.
+              </p>
+            </div>
+            <div class="hero-grid" id="overview-cards"></div>
+          </div>
+        </section>
+
+        <section class="view" id="presets-view">
+          <div class="panel-grid">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Saved Presets</h3>
+                <span class="muted" id="preset-count">0 presets</span>
+              </div>
+              <div class="preset-list" id="preset-list"></div>
+            </section>
+
+            <section class="panel panel-detail">
+              <div class="panel-head">
+                <h3>Preset Details</h3>
+                <span class="muted" id="selected-preset-name">Select a preset</span>
+              </div>
+              <div class="preset-detail" id="preset-detail">
+                <p class="muted">Choose a preset to inspect its timeframes, rules, and saved settings.</p>
+              </div>
+              <div class="editor-actions">
+                <button class="secondary-button" id="open-builder-button" type="button">Open In Rule Builder</button>
+              </div>
+              <div class="editor-head">
+                <h3>Preset Maintenance</h3>
+                <span class="muted" id="editor-status">Ready</span>
+              </div>
+              <div id="preset-editor-form" class="editor-form">
+                <label>
+                  <span>Preset Name</span>
+                  <input id="editor-preset-name" placeholder="Selected preset name" readonly />
+                </label>
+                <div class="editor-actions">
+                  <button class="secondary-button danger-button" id="delete-preset-button" type="button">Delete Preset</button>
+                </div>
+                <label class="editor-textarea">
+                  <span>Preset JSON</span>
+                  <textarea id="preset-json-editor" spellcheck="false" readonly></textarea>
+                </label>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="builder-view">
+          <div class="builder-view-grid">
+            <section class="panel builder-toolbar-panel">
+              <div class="builder-toolbar-top">
+                <div class="builder-toolbar-title">
+                  <div>
+                    <div class="eyebrow">Modern Rule Editor</div>
+                    <h3>Rule Builder</h3>
+                  </div>
+                  <span class="muted" id="builder-status">Ready</span>
+                </div>
+                <div class="builder-toolbar-quick">
+                  <button class="secondary-button" id="snapshot-refresh-button" type="button">Refresh Values</button>
+                  <button class="secondary-button" id="market-audit-button" type="button">Market Audit</button>
+                  <button class="primary-button" id="builder-save-button" type="button">Save Preset</button>
+                  <button class="secondary-button" id="builder-save-as-button" type="button">Save As...</button>
+                  <details class="builder-toolbar-disclosure" id="builder-toolbar-disclosure">
+                    <summary class="secondary-button">Preset Tray</summary>
+                    <div class="builder-toolbar-drawer">
+                      <label>
+                        <span>Working Preset</span>
+                        <select id="builder-preset-select"></select>
+                      </label>
+                      <label class="toggle toggle-inline">
+                        <input id="editor-set-last" type="checkbox" checked />
+                        <span>Set as last preset after save</span>
+                      </label>
+                      <div class="builder-toolbar-actions">
+                        <button class="secondary-button" id="builder-load-button" type="button">Load Preset</button>
+                        <button class="secondary-button" id="builder-reset-button" type="button">Reload Selected</button>
+                      </div>
+                    </div>
+                  </details>
+                </div>
+              </div>
+              <div class="pill-row">
+                <span class="pill" id="builder-working-preset-pill">No preset loaded</span>
+                <span class="pill" id="builder-target-pill">Target: none</span>
+                <span class="pill" id="snapshot-status">Use Preset Tray to load a preset into the builder.</span>
+              </div>
+            </section>
+
+            <section class="panel builder-verify-panel">
+              <div id="builder-verify-host">
+                <div class="empty-state">Live control surface is loading. It will show timeframe buttons, live status, and clickable indicator chips here.</div>
+              </div>
+            </section>
+
+            <div class="builder-workspace">
+              <section class="panel builder-editor-panel">
+                <div class="panel-head">
+                  <h3>Visual Rule Groups</h3>
+                  <span class="muted">Choose a section, then click a group card to make it the active insert target.</span>
+                </div>
+                <div class="builder-surface" id="preset-builder"></div>
+              </section>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="backtest-view">
+          <div class="panel-grid single-column">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Run Backtest</h3>
+                <span class="muted">Background job powered by the current Python engine</span>
+              </div>
+              <form id="backtest-form" class="form-grid">
+                <label>
+                  <span>Preset</span>
+                  <select id="preset-select" name="preset_name"></select>
+                </label>
+                <label>
+                  <span>Start Override (UTC)</span>
+                  <input id="start-input" name="start" type="datetime-local" step="60" />
+                </label>
+                <label>
+                  <span>End Override (UTC)</span>
+                  <input id="end-input" name="end" type="datetime-local" step="60" />
+                </label>
+                <label>
+                  <span>Stop Loss %</span>
+                  <input id="stop-loss-input" name="stop_loss_value" type="number" step="0.1" value="0" />
+                </label>
+                <label>
+                  <span>Take Profit %</span>
+                  <input id="take-profit-input" name="take_profit_value" type="number" step="0.1" value="0" />
+                </label>
+                <label>
+                  <span>Break Even After MFE %</span>
+                  <input id="break-even-input" name="break_even_after_mfe_pct" type="number" step="0.1" value="0" />
+                </label>
+                <label>
+                  <span>Trailing Stop %</span>
+                  <input id="trailing-stop-input" name="trailing_stop_pct" type="number" step="0.1" value="0" />
+                </label>
+                <label>
+                  <span>Position Size (USDT)</span>
+                  <input id="position-size-input" name="order_notional" type="number" min="1" step="1" value="100" />
+                </label>
+                <label>
+                  <span>Commission %</span>
+                  <input id="commission-input" name="fee_pct" type="number" min="0" step="0.001" value="0.04" />
+                </label>
+                <label>
+                  <span>Equity Stride</span>
+                  <input id="equity-stride-input" name="equity_curve_stride" type="number" min="1" step="1" value="15" />
+                </label>
+                <label class="toggle">
+                  <input id="allow-reverse-input" name="allow_reverse" type="checkbox" checked />
+                  <span>Allow reverse entries</span>
+                </label>
+                <label class="toggle">
+                  <input id="capture-details-input" name="capture_trade_details" type="checkbox" />
+                  <span>Capture heavy trade details</span>
+                </label>
+                <div class="form-actions backtest-form-actions">
+                  <button class="primary-button" type="submit">Run Backtest</button>
+                  <button class="secondary-button" id="backtest-load-preset-button" type="button">Load Preset Values</button>
+                  <button class="secondary-button" id="backtest-save-preset-button" type="button">Save Preset</button>
+                  <button class="secondary-button" id="backtest-save-as-button" type="button">Save As...</button>
+                </div>
+                <p class="muted backtest-form-status" id="backtest-form-status">Backtest form can load and save preset-backed values directly from this tab.</p>
+              </form>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Job Status</h3>
+                <span class="muted" id="job-status-text">Idle</span>
+              </div>
+              <div class="progress-track">
+                <div class="progress-fill" id="job-progress-fill"></div>
+              </div>
+              <p class="muted" id="job-message">Nothing running right now.</p>
+            </section>
+
+            <section class="panel" id="result-panel">
+              <div class="panel-head">
+                <h3>Latest Result</h3>
+                <span class="muted" id="result-bundle-path">No result yet</span>
+              </div>
+              <div class="metrics-grid" id="result-metrics"></div>
+              <div class="two-up">
+                <div class="subpanel">
+                  <div class="chart-head">
+                    <h4>Sample Trades</h4>
+                    <span class="muted" id="trades-table-status">Base backtest trades render here as soon as the core run finishes.</span>
+                  </div>
+                  <div class="table-wrap table-wrap-fixed table-wrap-lg">
+                    <table class="data-table">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Side</th>
+                          <th>Entry</th>
+                          <th>Exit</th>
+                          <th>Net PnL</th>
+                          <th>Return %</th>
+                        </tr>
+                      </thead>
+                      <tbody id="trades-table-body"></tbody>
+                    </table>
+                  </div>
+                </div>
+                <div class="subpanel">
+                  <div class="chart-head">
+                    <h4>Event Activity</h4>
+                  </div>
+                  <div class="activity-list" id="event-activity"></div>
+                </div>
+              </div>
+              <div class="trade-inspector-shell">
+                <div class="chart-head">
+                  <h4>Trade Inspector</h4>
+                  <span class="muted" id="trade-inspector-status">Click a trade row to inspect the full trade report.</span>
+                </div>
+                <div class="trade-inspector-grid" id="trade-inspector-grid">
+                  <div class="empty-state">Trade report will appear here after you select a trade from the table above.</div>
+                </div>
+                <div class="chart-card trade-chart-card">
+                  <div class="chart-head">
+                    <h4>Entry To Exit Chart</h4>
+                    <span class="muted" id="trade-chart-status">The chart focuses on the selected trade window.</span>
+                  </div>
+                  <div class="trade-lifecycle-strip" id="trade-lifecycle-strip">
+                    <div class="empty-state">Trade lifecycle events will appear here with the selected trade.</div>
+                  </div>
+                  <canvas id="trade-chart-canvas" width="960" height="360"></canvas>
+                </div>
+                <div class="chart-card trade-bar-table-card">
+                  <div class="chart-head">
+                    <h4>Bar Timeline</h4>
+                    <span class="muted" id="trade-bar-table-status">Bars around the selected trade will appear here.</span>
+                  </div>
+                  <div class="table-wrap table-wrap-fixed trade-bar-table-wrap">
+                    <table class="data-table trade-bar-table">
+                      <thead>
+                        <tr>
+                          <th>Bar</th>
+                          <th>Time (UTC)</th>
+                          <th>Open</th>
+                          <th>High</th>
+                          <th>Low</th>
+                          <th>Close</th>
+                          <th>Events</th>
+                        </tr>
+                      </thead>
+                      <tbody id="trade-bar-table-body"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+              <div class="chart-card">
+                <div class="chart-head">
+                  <h4>Equity Preview</h4>
+                  <span class="muted">Sampled from the real equity curve</span>
+                </div>
+                <canvas id="equity-canvas" width="960" height="240"></canvas>
+              </div>
+            </section>
+
+            <section class="panel" id="exit-sweep-panel">
+              <div class="panel-head">
+                <h3>Post-Backtest Exit Sweep</h3>
+                <span class="muted" id="exit-sweep-status">Run a backtest first, then search exit combinations here.</span>
+              </div>
+              <div class="exit-sweep-layout">
+                <div class="exit-sweep-toolbar">
+                  <label class="toggle">
+                    <input id="exit-sweep-auto-run-input" type="checkbox" />
+                    <span>Auto-run after backtest</span>
+                  </label>
+                  <label>
+                    <span>Sort By</span>
+                    <select id="exit-sweep-sort-by">
+                      <option value="net_profit">Net Profit</option>
+                      <option value="return_pct">Return %</option>
+                      <option value="ending_balance">Ending Balance</option>
+                      <option value="profit_factor">Profit Factor</option>
+                      <option value="win_rate_pct">Win Rate %</option>
+                      <option value="max_drawdown_pct">Max DD %</option>
+                      <option value="num_trades">Trades</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Max Combos</span>
+                    <input id="exit-sweep-max-combos-input" type="number" min="1" step="1" value="5000" />
+                  </label>
+                  <div class="exit-sweep-estimate muted" id="exit-sweep-estimate">No sweep range configured yet.</div>
+                </div>
+
+                <div class="exit-sweep-axis-grid">
+                  <section class="subpanel exit-sweep-axis-card">
+                    <div class="chart-head">
+                      <h4>Stop Loss % Sweep</h4>
+                    </div>
+                    <div class="form-grid exit-sweep-form-grid">
+                      <label>
+                        <span>From</span>
+                        <input id="sweep-stop-loss-start" type="number" step="0.1" value="0.5" />
+                      </label>
+                      <label>
+                        <span>To</span>
+                        <input id="sweep-stop-loss-end" type="number" step="0.1" value="2" />
+                      </label>
+                      <label>
+                        <span>Step</span>
+                        <input id="sweep-stop-loss-step" type="number" step="0.05" value="0.25" />
+                      </label>
+                    </div>
+                    <label class="toggle toggle-inline">
+                      <input id="sweep-stop-loss-off" type="checkbox" />
+                      <span>Include OFF</span>
+                    </label>
+                  </section>
+
+                  <section class="subpanel exit-sweep-axis-card">
+                    <div class="chart-head">
+                      <h4>Take Profit % Sweep</h4>
+                    </div>
+                    <div class="form-grid exit-sweep-form-grid">
+                      <label>
+                        <span>From</span>
+                        <input id="sweep-take-profit-start" type="number" step="0.1" value="1" />
+                      </label>
+                      <label>
+                        <span>To</span>
+                        <input id="sweep-take-profit-end" type="number" step="0.1" value="4" />
+                      </label>
+                      <label>
+                        <span>Step</span>
+                        <input id="sweep-take-profit-step" type="number" step="0.05" value="0.5" />
+                      </label>
+                    </div>
+                    <label class="toggle toggle-inline">
+                      <input id="sweep-take-profit-off" type="checkbox" />
+                      <span>Include OFF</span>
+                    </label>
+                  </section>
+
+                  <section class="subpanel exit-sweep-axis-card">
+                    <div class="chart-head">
+                      <h4>Break Even After MFE % Sweep</h4>
+                    </div>
+                    <div class="form-grid exit-sweep-form-grid">
+                      <label>
+                        <span>From</span>
+                        <input id="sweep-break-even-start" type="number" step="0.1" value="0.5" />
+                      </label>
+                      <label>
+                        <span>To</span>
+                        <input id="sweep-break-even-end" type="number" step="0.1" value="2" />
+                      </label>
+                      <label>
+                        <span>Step</span>
+                        <input id="sweep-break-even-step" type="number" step="0.05" value="0.25" />
+                      </label>
+                    </div>
+                    <label class="toggle toggle-inline">
+                      <input id="sweep-break-even-off" type="checkbox" checked />
+                      <span>Include OFF</span>
+                    </label>
+                  </section>
+
+                  <section class="subpanel exit-sweep-axis-card">
+                    <div class="chart-head">
+                      <h4>Trailing Stop % Sweep</h4>
+                    </div>
+                    <div class="form-grid exit-sweep-form-grid">
+                      <label>
+                        <span>From</span>
+                        <input id="sweep-trailing-stop-start" type="number" step="0.1" value="0.5" />
+                      </label>
+                      <label>
+                        <span>To</span>
+                        <input id="sweep-trailing-stop-end" type="number" step="0.1" value="2" />
+                      </label>
+                      <label>
+                        <span>Step</span>
+                        <input id="sweep-trailing-stop-step" type="number" step="0.05" value="0.25" />
+                      </label>
+                    </div>
+                    <label class="toggle toggle-inline">
+                      <input id="sweep-trailing-stop-off" type="checkbox" checked />
+                      <span>Include OFF</span>
+                    </label>
+                  </section>
+                </div>
+
+                <div class="editor-actions exit-sweep-actions">
+                  <button class="primary-button" id="exit-sweep-run-button" type="button">Run Exit Sweep</button>
+                  <button class="secondary-button" id="exit-sweep-apply-best-button" type="button">Apply Best Combo To Settings</button>
+                  <button class="secondary-button" id="exit-sweep-apply-selected-button" type="button">Apply Selected Combo</button>
+                </div>
+
+                <div class="metrics-grid" id="exit-sweep-best-cards"></div>
+                <div class="table-wrap table-wrap-fixed table-wrap-xl">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Rank</th>
+                        <th>SL %</th>
+                        <th>TP %</th>
+                        <th>BE %</th>
+                        <th>TR %</th>
+                        <th>Net</th>
+                        <th>Return %</th>
+                        <th>PF</th>
+                        <th>Win %</th>
+                        <th>Max DD %</th>
+                        <th>Trades</th>
+                        <th>SL</th>
+                        <th>TP</th>
+                        <th>BE</th>
+                        <th>TR</th>
+                      </tr>
+                    </thead>
+                    <tbody id="exit-sweep-table-body">
+                      <tr><td colspan="15" class="muted">No exit sweep results yet.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="downloader-view">
+          <div class="panel-grid single-column">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Downloader Scope</h3>
+                <span class="muted" id="downloader-status">Ready</span>
+              </div>
+              <form id="downloader-form" class="form-grid">
+                <label>
+                  <span>Symbol</span>
+                  <input id="downloader-symbol-input" placeholder="BTCUSDT" />
+                </label>
+                <label>
+                  <span>Cache Dir</span>
+                  <input id="downloader-cache-input" placeholder="data_cache" />
+                </label>
+                <label>
+                  <span>Start UTC</span>
+                  <input id="downloader-start-input" type="datetime-local" step="60" />
+                </label>
+                <label>
+                  <span>End UTC</span>
+                  <input id="downloader-end-input" type="datetime-local" step="60" />
+                </label>
+                <label>
+                  <span>Warmup Min</span>
+                  <input id="downloader-warmup-input" type="number" min="0" step="1" value="0" />
+                </label>
+                <label>
+                  <span>Price Source</span>
+                  <select id="downloader-price-source">
+                    <option value="LAST">LAST</option>
+                    <option value="MARK">MARK</option>
+                    <option value="INDEX">INDEX</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Req/Min</span>
+                  <input id="downloader-req-per-min-input" type="number" min="5" max="300" step="1" value="20" />
+                </label>
+              </form>
+              <p class="downloader-section-note">Downloader dates use the same UTC calendar inputs as Rule Builder. Candle and indicator actions auto-cap the end time to the last closed 1m candle if you point into the future.</p>
+              <div class="downloader-picker">
+                <div>
+                  <p class="eyebrow">Indicator Timeframes</p>
+                  <div class="timeframe-picks" id="downloader-timeframes"></div>
+                </div>
+                <div>
+                  <div class="downloader-picker-head">
+                    <p class="eyebrow">Indicator Rule Fields</p>
+                    <div class="downloader-picker-actions">
+                      <button class="mini-button" id="downloader-fields-select-all-button" type="button">Select All</button>
+                      <button class="mini-button" id="downloader-fields-clear-button" type="button">Clear</button>
+                    </div>
+                  </div>
+                  <div class="downloader-suite-grid" id="downloader-indicator-groups"></div>
+                  <p class="downloader-section-note compact">
+                    Each suite opens a popup with the ruleable fields that belong to it. The downloader still derives the required
+                    families and dependencies automatically, so nothing gets dropped.
+                  </p>
+                </div>
+              </div>
+              <div class="editor-actions">
+                <button class="secondary-button" id="downloader-use-preset-button" type="button">Use Selected Preset</button>
+                <button class="primary-button" id="downloader-inspect-button" type="button">Inspect Caches</button>
+              </div>
+              <div class="pill-row" id="downloader-pill-row"></div>
+            </section>
+
+            <div class="downloader-grid">
+              <section class="panel">
+                <div class="panel-head">
+                  <h3>Tick Cache</h3>
+                  <span class="muted" id="tick-summary-label">aggTrades daily cache</span>
+                </div>
+                <div class="downloader-switch-grid">
+                  <label class="toggle-card">
+                    <input id="downloader-prefer-tail-resume-input" type="checkbox" checked />
+                    <span>
+                      <strong>Prefer Tail Resume</strong>
+                      <small>Continue from the last cached aggTradeId when the start edge is already valid.</small>
+                    </span>
+                  </label>
+                  <label class="toggle-card">
+                    <input id="downloader-include-no-meta-input" type="checkbox" />
+                    <span>
+                      <strong>Include NO_META</strong>
+                      <small>Try rebuilding meta from existing files before deciding to re-download them.</small>
+                    </span>
+                  </label>
+                </div>
+                <div class="downloader-action-grid">
+                  <button class="secondary-button" id="tick-verify-button" type="button">Verify + Hash</button>
+                  <button class="secondary-button" id="tick-download-button" type="button">Download Missing</button>
+                  <button class="secondary-button" id="tick-repair-button" type="button">Continue / Repair</button>
+                  <button class="secondary-button" id="tick-update-open-button" type="button">Update OPEN</button>
+                </div>
+                <div class="metrics-grid" id="tick-summary-cards"></div>
+                <div class="table-wrap downloader-table-wrap">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Day</th>
+                        <th>Status</th>
+                        <th>Integrity</th>
+                        <th>Rows</th>
+                        <th>Last Tick</th>
+                        <th>MB</th>
+                        <th>Report</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tick-table-body"></tbody>
+                  </table>
+                </div>
+              </section>
+
+              <section class="panel" id="candle-store-panel">
+                <div class="panel-head">
+                  <h3>Candle Store</h3>
+                  <span class="muted">1m exact-window cache + local day store</span>
+                </div>
+                <div class="downloader-action-grid">
+                  <button class="secondary-button" id="candle-inspect-button" type="button">Inspect Candle Coverage</button>
+                  <button class="primary-button" id="candle-download-button" type="button">Download Missing Candles</button>
+                </div>
+                <p class="downloader-section-note">Inspect is read-only. Download Missing Candles fetches the 1m candles needed to cover the selected Start UTC, End UTC, Price Source, and Warmup window.</p>
+                <div id="candle-summary"></div>
+              </section>
+
+              <section class="panel" id="indicator-library-panel">
+                <div class="panel-head">
+                  <h3>Indicator Library</h3>
+                  <span class="muted">Profile-hashed local store + reusable exact caches</span>
+                </div>
+                <div class="downloader-action-grid">
+                  <button class="secondary-button" id="indicator-inspect-button" type="button">Inspect Indicator Coverage</button>
+                  <button class="primary-button" id="indicator-build-button" type="button">Build Indicator Store</button>
+                </div>
+                <p class="downloader-section-note">Inspect is read-only. Build Indicator Store calculates any missing indicator files for the selected families, timeframes, scope, and warmup.</p>
+                <div id="indicator-summary"></div>
+              </section>
+            </div>
+
+            <section class="panel">
+                <div class="panel-head">
+                  <h3>Downloader Jobs</h3>
+                  <div class="job-head-actions">
+                    <span class="muted" id="downloader-job-status-text">Idle</span>
+                    <span class="muted" id="downloader-job-progress-text">0%</span>
+                    <button class="mini-button danger" id="downloader-stop-job-button" type="button" disabled>Stop Job</button>
+                  </div>
+                </div>
+              <div class="progress-track">
+                <div class="progress-fill" id="downloader-job-progress-fill"></div>
+              </div>
+              <p class="muted" id="downloader-job-message">No downloader job running.</p>
+              <pre class="log-console" id="downloader-job-log">No logs yet.</pre>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="context-menu" id="context-menu"></div>
+
+    <div class="modal-backdrop" id="detail-modal-backdrop" hidden>
+      <div class="detail-modal">
+        <div class="detail-modal-head">
+          <div>
+            <p class="eyebrow">Inspector</p>
+            <h3 id="detail-modal-title">Details</h3>
+          </div>
+          <button class="mini-button" id="detail-modal-close" type="button">Close</button>
+        </div>
+        <div class="detail-modal-body" id="detail-modal-body"></div>
+      </div>
+    </div>
+
+    <script src="/app.js" defer></script>
+    <script src="/app_patch.js" defer></script>
+  </body>
+</html>

@@ -107,6 +107,40 @@ def _build_pack(args: argparse.Namespace) -> int:
     return _run("build_ai_research_pack", command)
 
 
+def _slim_profile(args: argparse.Namespace) -> int:
+    command = [
+        _python_executable(),
+        "scripts/manual/build_research_cache_profile.py",
+        "--symbol",
+        str(args.symbol),
+        "--start",
+        str(args.start),
+        "--end",
+        str(args.end),
+        "--cache-dir",
+        str(Path(args.cache_dir).expanduser().resolve()),
+        "--timeframes",
+        str(args.timeframes),
+        "--warmup-minutes",
+        str(args.warmup_minutes),
+    ]
+    if args.price_source:
+        command += ["--price-source", str(args.price_source)]
+    if args.indicator_fields:
+        command += ["--indicator-fields", str(args.indicator_fields)]
+    elif args.indicator_families:
+        command += ["--indicator-families", str(args.indicator_families)]
+    if args.save_exact_indicator_cache:
+        command.append("--save-exact-indicator-cache")
+    if args.save_prepared:
+        command.append("--save-prepared")
+    if args.disable_parallel:
+        command.append("--disable-parallel")
+    if args.output_json:
+        command += ["--output-json", str(Path(args.output_json).expanduser().resolve())]
+    return _run("slim_profile", command)
+
+
 def _submit_pack(args: argparse.Namespace) -> int:
     command = [
         _python_executable(),
@@ -156,6 +190,22 @@ def build_parser() -> argparse.ArgumentParser:
     pack.add_argument("--recent-days", type=int, default=45)
     pack.add_argument("--recent-warmup-days", type=int, default=7)
     pack.set_defaults(handler=_build_pack)
+
+    slim = sub.add_parser("slim-profile", help="Build a slim candle + indicator cache profile for remote backtests.")
+    slim.add_argument("--symbol", default="BTCUSDT")
+    slim.add_argument("--start", required=True)
+    slim.add_argument("--end", required=True)
+    slim.add_argument("--price-source", default="LAST")
+    slim.add_argument("--cache-dir", default=str(_default_cache_dir()))
+    slim.add_argument("--timeframes", default="1m,5m,15m,30m,1h")
+    slim.add_argument("--warmup-minutes", type=int, default=600)
+    slim.add_argument("--indicator-families", default="ohlcv,vidya,range_filter,stoch_rsi,taker_bias")
+    slim.add_argument("--indicator-fields", default="")
+    slim.add_argument("--save-exact-indicator-cache", action="store_true")
+    slim.add_argument("--save-prepared", action="store_true")
+    slim.add_argument("--disable-parallel", action="store_true")
+    slim.add_argument("--output-json", default="")
+    slim.set_defaults(handler=_slim_profile)
 
     submit = sub.add_parser("submit-pack", help="Submit a compact AI research pack to OpenAI Code Interpreter.")
     submit.add_argument("--zip", required=True)

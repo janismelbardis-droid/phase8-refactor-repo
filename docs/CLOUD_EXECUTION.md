@@ -64,9 +64,76 @@ Supported flows:
 
 ```bash
 python tools/remote_job.py smoke
+python tools/remote_job.py slim-profile --start "2026-04-20 00:00:00+00:00" --end "2026-04-20 04:00:00+00:00"
 python tools/remote_job.py saved-preset --preset "My Preset" --start "2026-03-01 00:00:00" --end "2026-04-01 00:00:00"
 python tools/remote_job.py build-pack --output-dir dist/ai_pack
 python tools/remote_job.py submit-pack --zip dist/ai_pack/ai_research_pack.zip
+```
+
+## Recommended Codex cloud environment for this repo
+
+Use the public repository:
+
+- `janismelbardis-droid/phase8-refactor-repo`
+
+Recommended environment settings:
+
+1. Setup script:
+
+```bash
+bash scripts/cloud_bootstrap.sh
+```
+
+2. Internet access:
+
+- enable it when the task may need to install dependencies or fetch missing candles
+- disable it for analysis-only tasks that work entirely from an already prepared cache
+
+3. Cache path:
+
+- default cloud bootstrap path is `$PWD/.cache/trade_inspector`
+- override with `TRADE_INSPECTOR_CACHE_DIR` if you mount or sync a different storage location
+
+## Slim backtest workflow
+
+The default cloud workflow should now stay slim:
+
+- keep canonical candles in `ohlcv_store`
+- keep only the indicator families actually used by the backtest
+- do not persist `indicator_streams` unless explicitly requested
+- do not persist `prepared_datasets` unless explicitly requested
+- avoid `market_aug` unless a strategy genuinely needs it
+
+Example slim profile build:
+
+```bash
+python tools/remote_job.py slim-profile \
+  --symbol BTCUSDT \
+  --start "2026-04-20 00:00:00+00:00" \
+  --end "2026-04-20 04:00:00+00:00" \
+  --indicator-families "ohlcv,vidya,range_filter,stoch_rsi,taker_bias"
+```
+
+If you want exact-window indicator cache files anyway:
+
+```bash
+python tools/remote_job.py slim-profile \
+  --symbol BTCUSDT \
+  --start "2026-04-20 00:00:00+00:00" \
+  --end "2026-04-20 04:00:00+00:00" \
+  --indicator-families "ohlcv,vidya,range_filter,stoch_rsi,taker_bias" \
+  --save-exact-indicator-cache
+```
+
+If a workflow truly needs `prepared_datasets`:
+
+```bash
+python tools/remote_job.py slim-profile \
+  --symbol BTCUSDT \
+  --start "2026-04-20 00:00:00+00:00" \
+  --end "2026-04-20 04:00:00+00:00" \
+  --indicator-families "ohlcv,vidya,range_filter,stoch_rsi,taker_bias" \
+  --save-prepared
 ```
 
 ## GitHub Actions

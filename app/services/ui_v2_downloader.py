@@ -182,6 +182,19 @@ def _coerce_req_per_min(raw: Any) -> float:
     return max(5.0, min(300.0, value))
 
 
+def _coerce_bool(raw: Any, default: bool) -> bool:
+    if raw is None:
+        return bool(default)
+    if isinstance(raw, bool):
+        return raw
+    text = str(raw).strip().lower()
+    if text in {"1", "true", "yes", "on"}:
+        return True
+    if text in {"0", "false", "no", "off"}:
+        return False
+    return bool(default)
+
+
 def _coerce_indicator_families(raw: Any) -> List[str]:
     if raw is None:
         return sorted(DEFAULT_COMPUTE_FAMILIES)
@@ -836,6 +849,7 @@ class DownloaderRuntimeService:
             "req_per_min": _coerce_req_per_min(raw.get("req_per_min")),
             "include_no_meta": bool(raw.get("include_no_meta", False)),
             "prefer_tail_resume": bool(raw.get("prefer_tail_resume", True)),
+            "save_exact_indicator_cache": _coerce_bool(raw.get("save_exact_indicator_cache"), False),
         }
 
     def _summary_with_scope(self, scope: Dict[str, Any], *, force_start: Optional[pd.Timestamp] = None, force_end: Optional[pd.Timestamp] = None) -> Dict[str, Any]:
@@ -1227,6 +1241,7 @@ class DownloaderRuntimeService:
         required_fields = scope.get("required_fields")
         ema_settings = scope.get("ema_settings")
         rsi_settings = scope.get("rsi_settings")
+        save_exact_indicator_cache = bool(scope.get("save_exact_indicator_cache", False))
         requested_warmup_minutes = int(scope["warmup_minutes"])
         warmup_minutes = max(
             requested_warmup_minutes,
@@ -1289,6 +1304,7 @@ class DownloaderRuntimeService:
             required_fields=required_fields,
             ema_settings=ema_settings,
             rsi_settings=rsi_settings,
+            save_exact_cache=save_exact_indicator_cache,
         )
         stream_rows = {tf: int(len(frame)) for tf, frame in (streams or {}).items() if isinstance(frame, pd.DataFrame)}
         log("Indicator streams computed. Refreshing cache coverage summary so the panels reflect the new files.")
@@ -1318,6 +1334,7 @@ class DownloaderRuntimeService:
             "ema_profile_signature": _requested_ema_profile_signature(required_fields, ema_settings, timeframes),
             "rsi_profile_signature": _requested_rsi_profile_signature(required_fields, rsi_settings, timeframes),
             "feature_signature": feature_signature(required_fields, include_defaults=True),
+            "save_exact_indicator_cache": save_exact_indicator_cache,
             "stream_rows": stream_rows,
             "summary": summary,
         }

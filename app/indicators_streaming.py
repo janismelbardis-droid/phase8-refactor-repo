@@ -7544,11 +7544,13 @@ def simulate_multitf_indicators(
     ema_settings: Optional[Any] = None,
     rsi_settings: Optional[Any] = None,
     market_state_thresholds: MarketStateThresholds = DEFAULT_MARKET_STATE_THRESHOLDS,
+    save_exact_cache: bool = False,
 ) -> Dict[str, "pd.DataFrame"]:
     """
     Public API used by the backtest worker.
     - Uses fast simulation.
-    - Optionally caches the computed streams to disk.
+    - Persists canonical day-store data when a cache directory is configured.
+    - Exact-window indicator cache files are opt-in because they duplicate the day-store.
     """
     timings: Dict[str, float] = {}
     build_mode = "monolithic_fast"
@@ -7618,33 +7620,34 @@ def simulate_multitf_indicators(
                         progress_cb(f"Loaded covering indicator cache ({os.path.basename(cover_pq)}).", 100)
                     except Exception:
                         pass
-                try:
-                    meta = {
-                        "report_version": INDICATOR_CACHE_VERSION,
-                        "created_at_utc": pd.Timestamp.now(tz="UTC").isoformat(),
-                        "symbol": symbol.upper(),
-                        "start_utc": pd.to_datetime(start_utc, utc=True).isoformat(),
-                        "end_utc": pd.to_datetime(end_utc, utc=True).isoformat(),
-                        "timeframes": list(timeframes or []),
-                        "price_source": str(price_source or "LAST").upper(),
-                        "macd_impl": str(macd_impl or "TRADINGVIEW").upper(),
-                        "adx_impl": str(adx_impl or "TRADINGVIEW").upper(),
-                        "macd_params": {"fast": MACD_FAST, "slow": MACD_SLOW, "signal": MACD_SIGNAL},
-                        "ppo_params": {"fast": PPO_FAST, "slow": PPO_SLOW, "smooth": PPO_SMOOTH},
-                        "adx_params": {"length": ADX_LEN},
-                        "rsi_params": {"length": int(resolved_rsi["length"]), "smoothing": int(resolved_rsi["smoothing"])},
-                        "vidya_params": {"length": VIDYA_LENGTH, "momentum": VIDYA_MOMENTUM, "band_distance": VIDYA_BAND_DISTANCE},
-                        "stoch_rsi_params": {"rsi_length": STOCH_RSI_RSI_LENGTH, "stoch_length": STOCH_RSI_STOCH_LENGTH, "smooth_k": STOCH_RSI_SMOOTH_K, "smooth_d": STOCH_RSI_SMOOTH_D},
-                        "required_families": sorted(normalize_required_families(required_fields, include_defaults=True)),
-                        "ema_profile_signature": _ema_profile_signature_for_request(required_fields, ema_settings, timeframes),
-                        "rsi_profile_signature": _rsi_profile_signature_for_request(required_fields, rsi_settings if rsi_settings is not None else ema_settings, timeframes),
-                        "build_mode": "covering_cache_slice",
-                        "build_stats": {"covering_cache_file": os.path.basename(cover_pq)},
-                        "timings": dict(timings),
-                    }
-                    _save_indicator_cache(pq, meta_path, meta, sliced_streams)
-                except Exception:
-                    pass
+                if save_exact_cache:
+                    try:
+                        meta = {
+                            "report_version": INDICATOR_CACHE_VERSION,
+                            "created_at_utc": pd.Timestamp.now(tz="UTC").isoformat(),
+                            "symbol": symbol.upper(),
+                            "start_utc": pd.to_datetime(start_utc, utc=True).isoformat(),
+                            "end_utc": pd.to_datetime(end_utc, utc=True).isoformat(),
+                            "timeframes": list(timeframes or []),
+                            "price_source": str(price_source or "LAST").upper(),
+                            "macd_impl": str(macd_impl or "TRADINGVIEW").upper(),
+                            "adx_impl": str(adx_impl or "TRADINGVIEW").upper(),
+                            "macd_params": {"fast": MACD_FAST, "slow": MACD_SLOW, "signal": MACD_SIGNAL},
+                            "ppo_params": {"fast": PPO_FAST, "slow": PPO_SLOW, "smooth": PPO_SMOOTH},
+                            "adx_params": {"length": ADX_LEN},
+                            "rsi_params": {"length": int(resolved_rsi["length"]), "smoothing": int(resolved_rsi["smoothing"])},
+                            "vidya_params": {"length": VIDYA_LENGTH, "momentum": VIDYA_MOMENTUM, "band_distance": VIDYA_BAND_DISTANCE},
+                            "stoch_rsi_params": {"rsi_length": STOCH_RSI_RSI_LENGTH, "stoch_length": STOCH_RSI_STOCH_LENGTH, "smooth_k": STOCH_RSI_SMOOTH_K, "smooth_d": STOCH_RSI_SMOOTH_D},
+                            "required_families": sorted(normalize_required_families(required_fields, include_defaults=True)),
+                            "ema_profile_signature": _ema_profile_signature_for_request(required_fields, ema_settings, timeframes),
+                            "rsi_profile_signature": _rsi_profile_signature_for_request(required_fields, rsi_settings if rsi_settings is not None else ema_settings, timeframes),
+                            "build_mode": "covering_cache_slice",
+                            "build_stats": {"covering_cache_file": os.path.basename(cover_pq)},
+                            "timings": dict(timings),
+                        }
+                        _save_indicator_cache(pq, meta_path, meta, sliced_streams)
+                    except Exception:
+                        pass
                 return sliced_streams
         local_started = time.perf_counter()
         local_store = _load_local_indicator_store_window(
@@ -7668,33 +7671,34 @@ def simulate_multitf_indicators(
                     progress_cb("Loaded local indicator store.", 100)
                 except Exception:
                     pass
-            try:
-                meta = {
-                    "report_version": INDICATOR_CACHE_VERSION,
-                    "created_at_utc": pd.Timestamp.now(tz="UTC").isoformat(),
-                    "symbol": symbol.upper(),
-                    "start_utc": pd.to_datetime(start_utc, utc=True).isoformat(),
-                    "end_utc": pd.to_datetime(end_utc, utc=True).isoformat(),
-                    "timeframes": list(timeframes or []),
-                    "price_source": str(price_source or "LAST").upper(),
-                    "macd_impl": str(macd_impl or "TRADINGVIEW").upper(),
-                    "adx_impl": str(adx_impl or "TRADINGVIEW").upper(),
-                    "macd_params": {"fast": MACD_FAST, "slow": MACD_SLOW, "signal": MACD_SIGNAL},
-                    "ppo_params": {"fast": PPO_FAST, "slow": PPO_SLOW, "smooth": PPO_SMOOTH},
-                    "adx_params": {"length": ADX_LEN},
-                    "rsi_params": {"length": int(resolved_rsi["length"]), "smoothing": int(resolved_rsi["smoothing"])},
-                    "vidya_params": {"length": VIDYA_LENGTH, "momentum": VIDYA_MOMENTUM, "band_distance": VIDYA_BAND_DISTANCE},
-                    "stoch_rsi_params": {"rsi_length": STOCH_RSI_RSI_LENGTH, "stoch_length": STOCH_RSI_STOCH_LENGTH, "smooth_k": STOCH_RSI_SMOOTH_K, "smooth_d": STOCH_RSI_SMOOTH_D},
-                    "required_families": sorted(normalize_required_families(required_fields, include_defaults=True)),
-                    "ema_profile_signature": _ema_profile_signature_for_request(required_fields, ema_settings, timeframes),
-                    "rsi_profile_signature": _rsi_profile_signature_for_request(required_fields, rsi_settings if rsi_settings is not None else ema_settings, timeframes),
-                    "build_mode": "existing_local_store",
-                    "build_stats": {"source_rows": int(len(df_1m)) if isinstance(df_1m, pd.DataFrame) else 0},
-                    "timings": dict(timings),
-                }
-                _save_indicator_cache(pq, meta_path, meta, local_store)
-            except Exception:
-                pass
+            if save_exact_cache:
+                try:
+                    meta = {
+                        "report_version": INDICATOR_CACHE_VERSION,
+                        "created_at_utc": pd.Timestamp.now(tz="UTC").isoformat(),
+                        "symbol": symbol.upper(),
+                        "start_utc": pd.to_datetime(start_utc, utc=True).isoformat(),
+                        "end_utc": pd.to_datetime(end_utc, utc=True).isoformat(),
+                        "timeframes": list(timeframes or []),
+                        "price_source": str(price_source or "LAST").upper(),
+                        "macd_impl": str(macd_impl or "TRADINGVIEW").upper(),
+                        "adx_impl": str(adx_impl or "TRADINGVIEW").upper(),
+                        "macd_params": {"fast": MACD_FAST, "slow": MACD_SLOW, "signal": MACD_SIGNAL},
+                        "ppo_params": {"fast": PPO_FAST, "slow": PPO_SLOW, "smooth": PPO_SMOOTH},
+                        "adx_params": {"length": ADX_LEN},
+                        "rsi_params": {"length": int(resolved_rsi["length"]), "smoothing": int(resolved_rsi["smoothing"])},
+                        "vidya_params": {"length": VIDYA_LENGTH, "momentum": VIDYA_MOMENTUM, "band_distance": VIDYA_BAND_DISTANCE},
+                        "stoch_rsi_params": {"rsi_length": STOCH_RSI_RSI_LENGTH, "stoch_length": STOCH_RSI_STOCH_LENGTH, "smooth_k": STOCH_RSI_SMOOTH_K, "smooth_d": STOCH_RSI_SMOOTH_D},
+                        "required_families": sorted(normalize_required_families(required_fields, include_defaults=True)),
+                        "ema_profile_signature": _ema_profile_signature_for_request(required_fields, ema_settings, timeframes),
+                        "rsi_profile_signature": _rsi_profile_signature_for_request(required_fields, rsi_settings if rsi_settings is not None else ema_settings, timeframes),
+                        "build_mode": "existing_local_store",
+                        "build_stats": {"source_rows": int(len(df_1m)) if isinstance(df_1m, pd.DataFrame) else 0},
+                        "timings": dict(timings),
+                    }
+                    _save_indicator_cache(pq, meta_path, meta, local_store)
+                except Exception:
+                    pass
             return local_store
 
         materialize_started = time.perf_counter()
@@ -7735,33 +7739,34 @@ def simulate_multitf_indicators(
             if local_store is not None:
                 build_mode = str(materialized.get("build_mode") or "existing_local_store")
                 build_stats = dict(materialized)
-                try:
-                    meta = {
-                        "report_version": INDICATOR_CACHE_VERSION,
-                        "created_at_utc": pd.Timestamp.now(tz="UTC").isoformat(),
-                        "symbol": symbol.upper(),
-                        "start_utc": start_utc.isoformat(),
-                        "end_utc": end_utc.isoformat(),
-                        "timeframes": list(timeframes or []),
-                        "price_source": str(price_source or "LAST").upper(),
-                        "macd_impl": str(macd_impl or "TRADINGVIEW").upper(),
-                        "adx_impl": str(adx_impl or "TRADINGVIEW").upper(),
-                        "macd_params": {"fast": MACD_FAST, "slow": MACD_SLOW, "signal": MACD_SIGNAL},
-                        "ppo_params": {"fast": PPO_FAST, "slow": PPO_SLOW, "smooth": PPO_SMOOTH},
-                        "adx_params": {"length": ADX_LEN},
-                        "rsi_params": {"length": int(resolved_rsi["length"]), "smoothing": int(resolved_rsi["smoothing"])},
-                        "vidya_params": {"length": VIDYA_LENGTH, "momentum": VIDYA_MOMENTUM, "band_distance": VIDYA_BAND_DISTANCE},
-                        "stoch_rsi_params": {"rsi_length": STOCH_RSI_RSI_LENGTH, "stoch_length": STOCH_RSI_STOCH_LENGTH, "smooth_k": STOCH_RSI_SMOOTH_K, "smooth_d": STOCH_RSI_SMOOTH_D},
-                        "required_families": sorted(normalize_required_families(required_fields, include_defaults=True)),
-                        "ema_profile_signature": _ema_profile_signature_for_request(required_fields, ema_settings, timeframes),
-                        "rsi_profile_signature": _rsi_profile_signature_for_request(required_fields, rsi_settings if rsi_settings is not None else ema_settings, timeframes),
-                        "build_mode": build_mode,
-                        "build_stats": build_stats,
-                        "timings": dict(timings),
-                    }
-                    _save_indicator_cache(pq, meta_path, meta, local_store)
-                except Exception:
-                    pass
+                if save_exact_cache:
+                    try:
+                        meta = {
+                            "report_version": INDICATOR_CACHE_VERSION,
+                            "created_at_utc": pd.Timestamp.now(tz="UTC").isoformat(),
+                            "symbol": symbol.upper(),
+                            "start_utc": start_utc.isoformat(),
+                            "end_utc": end_utc.isoformat(),
+                            "timeframes": list(timeframes or []),
+                            "price_source": str(price_source or "LAST").upper(),
+                            "macd_impl": str(macd_impl or "TRADINGVIEW").upper(),
+                            "adx_impl": str(adx_impl or "TRADINGVIEW").upper(),
+                            "macd_params": {"fast": MACD_FAST, "slow": MACD_SLOW, "signal": MACD_SIGNAL},
+                            "ppo_params": {"fast": PPO_FAST, "slow": PPO_SLOW, "smooth": PPO_SMOOTH},
+                            "adx_params": {"length": ADX_LEN},
+                            "rsi_params": {"length": int(resolved_rsi["length"]), "smoothing": int(resolved_rsi["smoothing"])},
+                            "vidya_params": {"length": VIDYA_LENGTH, "momentum": VIDYA_MOMENTUM, "band_distance": VIDYA_BAND_DISTANCE},
+                            "stoch_rsi_params": {"rsi_length": STOCH_RSI_RSI_LENGTH, "stoch_length": STOCH_RSI_STOCH_LENGTH, "smooth_k": STOCH_RSI_SMOOTH_K, "smooth_d": STOCH_RSI_SMOOTH_D},
+                            "required_families": sorted(normalize_required_families(required_fields, include_defaults=True)),
+                            "ema_profile_signature": _ema_profile_signature_for_request(required_fields, ema_settings, timeframes),
+                            "rsi_profile_signature": _rsi_profile_signature_for_request(required_fields, rsi_settings if rsi_settings is not None else ema_settings, timeframes),
+                            "build_mode": build_mode,
+                            "build_stats": build_stats,
+                            "timings": dict(timings),
+                        }
+                        _save_indicator_cache(pq, meta_path, meta, local_store)
+                    except Exception:
+                        pass
                 return local_store
 
     simulate_started = time.perf_counter()
@@ -7793,35 +7798,36 @@ def simulate_multitf_indicators(
                 ema_settings=ema_settings,
                 rsi_settings=rsi_settings,
             )
-            meta = {
-                "report_version": INDICATOR_CACHE_VERSION,
-                "created_at_utc": pd.Timestamp.now(tz="UTC").isoformat(),
-                "symbol": symbol.upper(),
-                "start_utc": pd.to_datetime(start_utc, utc=True).isoformat(),
-                "end_utc": pd.to_datetime(end_utc, utc=True).isoformat(),
-                "timeframes": list(timeframes or []),
-                "price_source": str(price_source or "LAST").upper(),
-                "macd_impl": str(macd_impl or "TRADINGVIEW").upper(),
-                "adx_impl": str(adx_impl or "TRADINGVIEW").upper(),
-                "macd_params": {"fast": MACD_FAST, "slow": MACD_SLOW, "signal": MACD_SIGNAL},
-                "ppo_params": {"fast": PPO_FAST, "slow": PPO_SLOW, "smooth": PPO_SMOOTH},
-                "adx_params": {"length": ADX_LEN},
-                "rsi_params": {"length": int(resolved_rsi["length"]), "smoothing": int(resolved_rsi["smoothing"])},
-                "vidya_params": {"length": VIDYA_LENGTH, "momentum": VIDYA_MOMENTUM, "band_distance": VIDYA_BAND_DISTANCE},
-                "stoch_rsi_params": {"rsi_length": STOCH_RSI_RSI_LENGTH, "stoch_length": STOCH_RSI_STOCH_LENGTH, "smooth_k": STOCH_RSI_SMOOTH_K, "smooth_d": STOCH_RSI_SMOOTH_D},
-                "required_families": sorted(normalize_required_families(required_fields, include_defaults=True)),
-                "ema_profile_signature": _ema_profile_signature_for_request(required_fields, ema_settings, timeframes),
-                "rsi_profile_signature": _rsi_profile_signature_for_request(required_fields, rsi_settings if rsi_settings is not None else ema_settings, timeframes),
-                "build_mode": build_mode,
-                "build_stats": {
-                    **dict(build_stats),
-                    "source_rows": int(len(df_1m)) if isinstance(df_1m, pd.DataFrame) else 0,
-                },
-                "timings": dict(timings),
-            }
-            exact_save_started = time.perf_counter()
-            _save_indicator_cache(pq, meta_path, meta, streams)
-            timings["exact_cache_save_sec"] = float(time.perf_counter() - exact_save_started)
+            if save_exact_cache:
+                meta = {
+                    "report_version": INDICATOR_CACHE_VERSION,
+                    "created_at_utc": pd.Timestamp.now(tz="UTC").isoformat(),
+                    "symbol": symbol.upper(),
+                    "start_utc": pd.to_datetime(start_utc, utc=True).isoformat(),
+                    "end_utc": pd.to_datetime(end_utc, utc=True).isoformat(),
+                    "timeframes": list(timeframes or []),
+                    "price_source": str(price_source or "LAST").upper(),
+                    "macd_impl": str(macd_impl or "TRADINGVIEW").upper(),
+                    "adx_impl": str(adx_impl or "TRADINGVIEW").upper(),
+                    "macd_params": {"fast": MACD_FAST, "slow": MACD_SLOW, "signal": MACD_SIGNAL},
+                    "ppo_params": {"fast": PPO_FAST, "slow": PPO_SLOW, "smooth": PPO_SMOOTH},
+                    "adx_params": {"length": ADX_LEN},
+                    "rsi_params": {"length": int(resolved_rsi["length"]), "smoothing": int(resolved_rsi["smoothing"])},
+                    "vidya_params": {"length": VIDYA_LENGTH, "momentum": VIDYA_MOMENTUM, "band_distance": VIDYA_BAND_DISTANCE},
+                    "stoch_rsi_params": {"rsi_length": STOCH_RSI_RSI_LENGTH, "stoch_length": STOCH_RSI_STOCH_LENGTH, "smooth_k": STOCH_RSI_SMOOTH_K, "smooth_d": STOCH_RSI_SMOOTH_D},
+                    "required_families": sorted(normalize_required_families(required_fields, include_defaults=True)),
+                    "ema_profile_signature": _ema_profile_signature_for_request(required_fields, ema_settings, timeframes),
+                    "rsi_profile_signature": _rsi_profile_signature_for_request(required_fields, rsi_settings if rsi_settings is not None else ema_settings, timeframes),
+                    "build_mode": build_mode,
+                    "build_stats": {
+                        **dict(build_stats),
+                        "source_rows": int(len(df_1m)) if isinstance(df_1m, pd.DataFrame) else 0,
+                    },
+                    "timings": dict(timings),
+                }
+                exact_save_started = time.perf_counter()
+                _save_indicator_cache(pq, meta_path, meta, streams)
+                timings["exact_cache_save_sec"] = float(time.perf_counter() - exact_save_started)
             local_save_started = time.perf_counter()
             _save_local_indicator_store(
                 cache_dir,
@@ -7839,7 +7845,10 @@ def simulate_multitf_indicators(
             timings["local_store_save_sec"] = float(time.perf_counter() - local_save_started)
             if progress_cb:
                 try:
-                    progress_cb(f"Saved indicator cache ({os.path.basename(pq)}).", 100)
+                    if save_exact_cache:
+                        progress_cb(f"Saved indicator cache ({os.path.basename(pq)}).", 100)
+                    else:
+                        progress_cb("Saved local indicator day-store.", 100)
                 except Exception:
                     pass
         except Exception:

@@ -116,6 +116,7 @@ def _preset_scope(
     cache_dir_override: Optional[str],
     start_override: Optional[str],
     end_override: Optional[str],
+    save_exact_indicator_cache: bool,
 ) -> Dict[str, Any]:
     settings = preset.get("settings", {})
     if not isinstance(settings, dict):
@@ -152,6 +153,7 @@ def _preset_scope(
         "indicator_fields": required_fields,
         "ema_settings": settings.get("ema_indicators"),
         "rsi_settings": settings.get("rsi_indicators"),
+        "save_exact_indicator_cache": bool(save_exact_indicator_cache),
     }
 
 
@@ -176,6 +178,7 @@ def _dedupe_key(action: str, scope: Dict[str, Any]) -> Tuple[Any, ...]:
         scope["end"],
         scope["warmup_minutes"],
         tuple(scope["indicator_fields"]),
+        bool(scope.get("save_exact_indicator_cache", False)),
         json.dumps(scope.get("ema_settings"), sort_keys=True, ensure_ascii=True),
         json.dumps(scope.get("rsi_settings"), sort_keys=True, ensure_ascii=True),
     )
@@ -204,7 +207,8 @@ def _run_action(runtime: DownloaderRuntimeService, action: str, scope: Dict[str,
     )
     if action == "indicator_build_window":
         print(
-            f"Fields={len(scope['indicator_fields'])} | warmup={scope['warmup_minutes']} min | cache={scope['cache_dir']}",
+            f"Fields={len(scope['indicator_fields'])} | exact_cache={bool(scope.get('save_exact_indicator_cache', False))} "
+            f"| warmup={scope['warmup_minutes']} min | cache={scope['cache_dir']}",
             flush=True,
         )
     else:
@@ -232,6 +236,11 @@ def main() -> int:
     parser.add_argument("--cache-dir", dest="cache_dir", default=None, help="Optional cache directory override.")
     parser.add_argument("--start", dest="start_override", default=None, help="Optional start UTC override.")
     parser.add_argument("--end", dest="end_override", default=None, help="Optional end UTC override.")
+    parser.add_argument(
+        "--save-exact-indicator-cache",
+        action="store_true",
+        help="Persist exact-window indicator_streams files. Disabled by default to keep preset builds slim.",
+    )
     parser.add_argument("--json-out", default=None, help="Optional path for a JSON summary.")
     args = parser.parse_args()
 
@@ -246,6 +255,7 @@ def main() -> int:
             cache_dir_override=args.cache_dir,
             start_override=args.start_override,
             end_override=args.end_override,
+            save_exact_indicator_cache=bool(args.save_exact_indicator_cache),
         )
         for name in preset_names
     ]

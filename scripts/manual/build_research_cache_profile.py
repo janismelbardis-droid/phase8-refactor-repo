@@ -18,9 +18,11 @@ from app.data_binance import fetch_klines_1m_futures
 from app.indicators_streaming import simulate_multitf_indicators
 from app.prepared_dataset import build_prepared_dataset, save_prepared_dataset_to_disk
 from app.services.ui_v2_downloader import DownloaderRuntimeService
+from app.strategy_requirements import DEFAULT_COMPUTE_FAMILIES, normalize_required_fields
 
 
 DEFAULT_TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h"]
+DEFAULT_INDICATOR_FAMILIES = ",".join(sorted(DEFAULT_COMPUTE_FAMILIES))
 
 
 def repo_root() -> Path:
@@ -51,6 +53,11 @@ def parse_timeframes(raw: str) -> List[str]:
     return out or list(DEFAULT_TIMEFRAMES)
 
 
+def parse_items(raw: str | None) -> List[str]:
+    parts = [part.strip() for part in str(raw or "").split(",")]
+    return [part for part in parts if part]
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Populate the shared data_cache for the research profile and optionally save a prepared dataset."
@@ -62,8 +69,34 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--cache-dir", default="data_cache")
     parser.add_argument("--timeframes", default="1m,5m,15m,30m,1h")
     parser.add_argument("--warmup-minutes", type=int, default=600)
+    parser.add_argument(
+        "--indicator-families",
+        default=DEFAULT_INDICATOR_FAMILIES,
+        help="Comma-separated indicator families to build. Defaults to the slim compute set without market_aug.",
+    )
+    parser.add_argument(
+        "--indicator-fields",
+        default=None,
+        help="Optional comma-separated exact indicator fields override. When set, it takes priority over families.",
+    )
+    parser.add_argument(
+        "--save-exact-indicator-cache",
+        action="store_true",
+        help="Also persist exact-window indicator_streams files. Disabled by default to keep the cache slim.",
+    )
     parser.add_argument("--disable-parallel", action="store_true")
-    parser.add_argument("--skip-prepared", action="store_true")
+    parser.add_argument(
+        "--save-prepared",
+        action="store_true",
+        help="Persist prepared_datasets output. Disabled by default because it duplicates the canonical stores.",
+    )
+    parser.add_argument(
+        "--skip-prepared",
+        dest="save_prepared",
+        action="store_false",
+        help="Deprecated compatibility flag. Prepared datasets are skipped by default.",
+    )
+    parser.set_defaults(save_prepared=False)
     parser.add_argument("--output-json", type=Path, default=None)
     return parser
 
@@ -77,6 +110,8 @@ def build_prepared_entry(
     price_source: str,
     cache_dir: str,
     timeframes: List[str],
+    required_selector: List[str] | None,
+    save_exact_indicator_cache: bool,
 ) -> str | None:
     cache_path = root / cache_dir
     start_ts = pd.to_datetime(start, utc=True)
@@ -106,9 +141,10 @@ def build_prepared_entry(
         start_utc=start_ts,
         end_utc=end_ts,
         price_source=price_source,
-        required_fields=None,
+        required_fields=required_selector,
         ema_settings=None,
         rsi_settings=None,
+        save_exact_cache=save_exact_indicator_cache,
     )
 
     emit_log("Saving prepared dataset to shared prepared_datasets store.")
@@ -120,7 +156,7 @@ def build_prepared_entry(
         price_source=price_source,
         macd_impl="TRADINGVIEW",
         adx_impl="TRADINGVIEW",
-        required_fields=None,
+        required_fields=required_selector,
         market_state_thresholds=None,
         df_1m_full=df_1m,
         streams_full=streams_full,
@@ -139,6 +175,8 @@ def main() -> int:
     root = repo_root()
     runtime = DownloaderRuntimeService(root)
     timeframes = parse_timeframes(args.timeframes)
+    indicator_fields = parse_items(args.indicator_fields)
+    indicator_families = parse_items(args.indicator_families)
     output_json = args.output_json
     if output_json is None:
         safe_end = (
@@ -160,7 +198,14 @@ def main() -> int:
         "price_source": str(args.price_source).strip().upper(),
         "timeframes": timeframes,
         "warmup_minutes": int(args.warmup_minutes),
+        "save_exact_indicator_cache": bool(args.save_exact_indicator_cache),
     }
+    if indicator_fields:
+        params["indicator_fields"] = indicator_fields
+        required_selector: List[str] | None = sorted(normalize_required_fields(indicator_fields, include_defaults=False))
+    else:
+        params["indicator_families"] = indicator_families
+        required_selector = indicator_families or sorted(DEFAULT_COMPUTE_FAMILIES)
 
     emit_log(
         f"Starting shared indicator build for {params['symbol']} "
@@ -174,7 +219,7 @@ def main() -> int:
     )
 
     prepared_path = None
-    if not args.skip_prepared:
+    if args.save_prepared:
         prepared_path = build_prepared_entry(
             root=root,
             symbol=params["symbol"],
@@ -183,6 +228,8 @@ def main() -> int:
             price_source=params["price_source"],
             cache_dir=params["cache_dir"],
             timeframes=timeframes,
+            required_selector=required_selector,
+            save_exact_indicator_cache=bool(args.save_exact_indicator_cache),
         )
 
     payload = {
@@ -190,6 +237,7 @@ def main() -> int:
         "indicator_build": result,
         "prepared_dataset_path": prepared_path,
         "parallel_disabled": bool(args.disable_parallel),
+        "save_prepared": bool(args.save_prepared),
     }
     output_json.write_text(json.dumps(payload, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
     emit_log(f"Saved run payload to {output_json}")

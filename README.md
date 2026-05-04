@@ -58,6 +58,12 @@ Headless saved-preset backtest:
 python tools/remote_job.py saved-preset --preset "My Preset" --start "2026-03-01 00:00:00" --end "2026-04-01 00:00:00"
 ```
 
+Build a slim backtest cache profile with only the indicator families you actually need:
+
+```bash
+python tools/remote_job.py slim-profile --start "2026-04-20 00:00:00+00:00" --end "2026-04-20 04:00:00+00:00"
+```
+
 Build a compact AI research pack for remote analysis:
 
 ```bash

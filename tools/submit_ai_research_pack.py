@@ -89,8 +89,12 @@ def submit(args: argparse.Namespace) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Submit AI research pack ZIP to OpenAI Code Interpreter.")
     parser.add_argument("--zip", required=True, help="Path to ai research pack ZIP.")
-    parser.add_argument("--model", default="gpt-5.5")
-    parser.add_argument("--memory-limit", default="4g", choices=["1g", "4g", "16g", "64g"])
+    parser.add_argument("--model", default=str(os.environ.get("OPENAI_MODEL", "gpt-5.5") or "gpt-5.5"))
+    parser.add_argument(
+        "--memory-limit",
+        default=str(os.environ.get("OPENAI_MEMORY_LIMIT", "4g") or "4g"),
+        choices=["1g", "4g", "16g", "64g"],
+    )
     parser.add_argument("--prompt-file", default="PROMPT_FOR_CHATGPT.md")
     parser.add_argument("--extra-prompt", default="")
     parser.add_argument("--output-dir", default="")

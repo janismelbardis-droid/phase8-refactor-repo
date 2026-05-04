@@ -1,0 +1,57 @@
+name: Build AI Research Pack
+
+on:
+  workflow_dispatch:
+    inputs:
+      symbol:
+        description: Symbol to include in the compact pack
+        required: true
+        default: BTCUSDT
+      include_recent:
+        description: Include the recent rolling window
+        required: true
+        default: "true"
+      recent_days:
+        description: Number of recent days to include
+        required: true
+        default: "45"
+      recent_warmup_days:
+        description: Warmup days to include before the recent window
+        required: true
+        default: "7"
+
+jobs:
+  build-pack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: bash scripts/cloud_bootstrap.sh
+
+      - name: Build compact research pack
+        shell: bash
+        run: |
+          include_flag="--no-include-recent"
+          if [ "${{ inputs.include_recent }}" = "true" ]; then
+            include_flag="--include-recent"
+          fi
+          python tools/remote_job.py build-pack \
+            --output-dir dist/ai_pack \
+            --symbol "${{ inputs.symbol }}" \
+            ${include_flag} \
+            --recent-days "${{ inputs.recent_days }}" \
+            --recent-warmup-days "${{ inputs.recent_warmup_days }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-research-pack
+          path: dist/ai_pack

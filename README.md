@@ -1,104 +1,133 @@
-# Refactored Trade Inspector
+# Trade Inspector
 
-This folder is a behavior-preserving refactor with phased hardening through Phase 8, plus a Phase 0/1 safety pass that freezes current backtest behavior and cleans the repo layout without changing indicator math or execution logic.
+Behavior-preserving refactor of the Trade Inspector / phase 8 backtest workspace.
 
-## Install dependencies
+This repository now carries:
+- runtime code
+- backtest and research tools
+- smoke checks and tests
+- cloud/remote execution helpers
+
+This repository does **not** carry the full local market cache. Large candle, indicator, and prepared-dataset stores stay outside git.
+
+## What is here
+
+- `app/` - runtime modules, backtest engine, indicator pipeline, UI
+- `tools/` - headless research and backtest entrypoints
+- `scripts/` - smoke checks, maintenance, release helpers
+- `docs/` - architecture, diagnostics, phased notes, cloud-run notes
+- `tests/` - regression and smoke coverage
+
+## Local quick start
+
+Install runtime dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-For tests and development:
+Install test and tooling dependencies:
 
 ```bash
 pip install -r requirements-dev.txt
 ```
 
-## Windows developer setup
-
-From the repo root, bootstrap the local virtual environment once:
+On Windows you can bootstrap the local virtualenv with:
 
 ```powershell
 .\bootstrap_dev.ps1
 ```
 
-Open a ready-to-use PowerShell session for the repo:
+## Main entrypoints
 
-```powershell
-. .\dev_shell.ps1
-```
-
-Run the default test suite:
-
-```powershell
-.\run_tests.ps1
-```
-
-Run tests faster across CPU cores:
-
-```powershell
-.\run_tests.ps1 -Fast
-```
-
-Run tests with coverage:
-
-```powershell
-.\run_tests.ps1 -Cov
-```
-
-Run the default tests plus the UI syntax check:
-
-```powershell
-.\run_checks.ps1
-```
-
-The helper scripts always use `.venv\Scripts\python.exe`, so they do not depend on whichever global `python` happens to be first on `PATH`.
-
-## Run
+Desktop UI:
 
 ```bash
 python run_app.py
 ```
 
-## Freeze current behavior
+Headless smoke:
 
 ```bash
-python scripts/generate_phase0_goldens.py
-python scripts/phase0_phase1_smoke_check.py
+python tools/remote_job.py smoke
 ```
 
-The Phase 0 harness locks the current bar-close, replay, and tick-based tester behavior against a deterministic synthetic fixture.
+Headless saved-preset backtest:
 
-## Clean release bundle
+```bash
+python tools/remote_job.py saved-preset --preset "My Preset" --start "2026-03-01 00:00:00" --end "2026-04-01 00:00:00"
+```
+
+Build a compact AI research pack for remote analysis:
+
+```bash
+python tools/remote_job.py build-pack --output-dir dist/ai_pack
+```
+
+Submit that compact pack to OpenAI Code Interpreter:
+
+```bash
+python tools/remote_job.py submit-pack --zip dist/ai_pack/ai_research_pack.zip
+```
+
+## Remote and cloud use
+
+The repo is prepared for two remote modes:
+
+1. GitHub Actions for smoke checks and lightweight remote automation.
+2. Compact AI research packs for OpenAI-hosted analysis instead of pushing a 17+ GB local cache into git.
+
+The main doc for this is:
+
+[docs/CLOUD_EXECUTION.md](docs/CLOUD_EXECUTION.md)
+
+## Cache and data policy
+
+Large runtime data stays outside git:
+
+- `data_cache/`
+- `runs/`
+- `.venv/`
+
+Use `TRADE_INSPECTOR_CACHE_DIR` when you want the code to work against an external cache mount or a copied cloud cache.
+
+Example:
+
+```bash
+export TRADE_INSPECTOR_CACHE_DIR=/mnt/trade-cache
+python tools/remote_job.py saved-preset --preset "My Preset"
+```
+
+Windows PowerShell:
+
+```powershell
+$env:TRADE_INSPECTOR_CACHE_DIR = "D:\trade-cache"
+python .\tools\remote_job.py saved-preset --preset "My Preset"
+```
+
+## Useful commands
+
+Run default pytest suite:
+
+```bash
+python -m pytest
+```
+
+Run the hardened smoke path:
+
+```bash
+python scripts/phase0_phase1_smoke_check.py
+python scripts/phase_final_hardening_smoke_check.py
+```
+
+Build a clean release bundle:
 
 ```bash
 python scripts/build_release_bundle.py
 ```
 
-The clean release artifact is written to `dist/phase8_trade_inspector_release.zip` when you build it.
-
-## Repo hygiene helper
+Audit and organize the local cache library:
 
 ```bash
-python scripts/clean_repo.py        # dry-run
-python scripts/clean_repo.py --apply
+python scripts/manual/organize_cache_library.py --cache-dir data_cache
 ```
-
-## Structure
-
-- `run_app.py` — entry point
-- `app/` — runtime source modules
-- `app/ui/` — extracted UI helpers
-- `app/ui/visual_app/` — `VisualApp` mixins (presets, live shell, backtest charts, lazy surfaces; split from `ui_app.py` without changing the public class)
-- `app/domain/market_state/` — market-state pipeline modules
-- `app/services/live/` — live helper services
-- `app/research/` — replay, validation, and support contracts
-- `docs/` — architecture, operator, diagnostics, and phased notes
-- `scripts/` — release, hygiene, and regression helpers
-- `archive/legacy/` — legacy material kept out of clean release bundles
-
-## Notes
-
-- Tick-based backtesting remains available; the Phase 0 harness now freezes that path too.
-- Generated caches, backups, release artifacts, and scratch files are intentionally kept out of clean bundles.
-- `ripgrep` (`rg`) is recommended for fast search; `dev_shell.ps1` refreshes `PATH` so the normal installed binary is picked up in new shells.

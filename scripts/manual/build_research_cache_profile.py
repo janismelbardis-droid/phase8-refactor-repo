@@ -4,7 +4,7 @@ import argparse
 import json
 import os
 import sys
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -30,7 +30,7 @@ def repo_root() -> Path:
 
 
 def utc_stamp() -> str:
-    return datetime.now(UTC).strftime("%H:%M:%S")
+    return datetime.now(timezone.utc).strftime("%H:%M:%S")
 
 
 def emit_progress(message: str, pct: float | None = None) -> None:

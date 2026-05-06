@@ -20,9 +20,21 @@ from .backtest_execution import (
 )
 from .backtest_frames import _prev_source_row_index_for_df, make_streams_htf_closed_only
 from .backtest_models import BacktestConfig, BacktestResult, Trade
-from .backtest_planning import _compile_tab_signal_arrays
+from .backtest import (
+    _bar_info_at,
+    _build_step_bars,
+    _combine_entry_filter_confirm_decisions,
+    _combine_entry_filter_signal_decisions,
+    _entry_filter_cfgs_for_groups,
+    _format_entry_reason,
+    _matching_group_indices_from_compiled,
+    _normalize_entry_filter_map,
+    _pending_from_signal,
+    _setup_still_valid_from_matches,
+)
+from .backtest_planning import _compile_tab_group_signal_arrays, _compile_tab_signal_arrays
 from .backtest_reporting import _apply_trade_reporting_metrics, build_backtest_replay_strategy_signature
-from .strategy_compiler import FAST_BAR_ENGINE, compile_strategy_plan
+from .strategy_compiler import FAST_BAR_ENGINE, _compiled_safe_entry_filter_tabs, compile_strategy_plan
 from .utils_time import interval_to_ms
 
 
@@ -35,6 +47,7 @@ class CompiledBarPlan:
     df_1m: pd.DataFrame
     idx: pd.DatetimeIndex
     compiled_tabs: Dict[str, np.ndarray]
+    compiled_group_signals: Dict[str, List[np.ndarray]]
     decision_mask: np.ndarray
     price_arr: np.ndarray
     open_arr: np.ndarray
@@ -56,6 +69,7 @@ class CompiledReplayPlan:
     end: pd.Timestamp
     idx: pd.DatetimeIndex
     compiled_tabs: Dict[str, np.ndarray]
+    compiled_group_signals: Dict[str, List[np.ndarray]]
     decision_mask: np.ndarray
     price_arr: np.ndarray
     open_arr: np.ndarray
@@ -268,6 +282,13 @@ def build_compiled_bar_plan(
         prev_source_row_by_tf,
         len(df1),
     )
+    compiled_group_signals = _compile_tab_group_signal_arrays(
+        dict(rules_model or {}),
+        {k: list(v) for k, v in dict(group_rule_join_mode or {}).items()},
+        prepared_streams,
+        prev_source_row_by_tf,
+        len(df1),
+    )
     timing_compile_signals_sec = time.perf_counter() - t0
 
     for tab_name in strategy_plan.active_tabs:
@@ -306,6 +327,7 @@ def build_compiled_bar_plan(
         df_1m=df1,
         idx=idx,
         compiled_tabs=compiled_tabs,
+        compiled_group_signals=compiled_group_signals,
         decision_mask=decision_mask,
         price_arr=price_arr,
         open_arr=open_arr,
@@ -363,6 +385,7 @@ def _compiled_replay_plan(plan: CompiledBarPlan | CompiledReplayPlan) -> Compile
         end=pd.to_datetime(plan.end, utc=True),
         idx=pd.DatetimeIndex(plan.idx),
         compiled_tabs={str(key): value for key, value in dict(plan.compiled_tabs or {}).items()},
+        compiled_group_signals={str(key): list(value or []) for key, value in dict(plan.compiled_group_signals or {}).items()},
         decision_mask=plan.decision_mask,
         price_arr=plan.price_arr,
         open_arr=plan.open_arr,
@@ -391,12 +414,29 @@ def _compiled_replay_event_driven_supported(
     cfg: BacktestConfig,
     *,
     capture_trade_details: Optional[bool],
+    entry_filters: Optional[Mapping[str, Any]],
 ) -> bool:
     if _compiled_replay_effective_capture_trade_details(cfg, capture_trade_details):
+        return False
+    if _compiled_safe_entry_filter_tabs(entry_filters, cfg):
         return False
     stop_mode = str(getattr(cfg, "stop_loss_mode", "OFF") or "OFF").upper()
     take_mode = str(getattr(cfg, "take_profit_mode", "OFF") or "OFF").upper()
     return stop_mode in {"OFF", "PERCENT", "ABSOLUTE"} and take_mode in {"OFF", "PERCENT", "ABSOLUTE"}
+
+
+def _compiled_step_bars_from_plan(plan: CompiledBarPlan, step_tf: str) -> pd.DataFrame:
+    frame = pd.DataFrame(
+        {
+            "open": plan.open_arr,
+            "high": plan.high_arr,
+            "low": plan.low_arr,
+            "close": plan.close_arr,
+            "close_time": pd.DatetimeIndex(plan.idx),
+        },
+        index=pd.DatetimeIndex(plan.idx),
+    )
+    return _build_step_bars(frame, step_tf)
 
 
 def _compiled_trade_extrema(
@@ -1133,6 +1173,7 @@ def run_backtest_compiled_plan(
     open_time_ns_arr = plan.open_time_ns_arr
     decision_mask = plan.decision_mask
     compiled_tabs = plan.compiled_tabs
+    compiled_group_signals = plan.compiled_group_signals
     empty_signal = np.zeros(row_count, dtype=bool)
     long_entry_arr = compiled_tabs.get("Long Entry", empty_signal)
     long_exit_arr = compiled_tabs.get("Long Exit", empty_signal)
@@ -1185,12 +1226,62 @@ def run_backtest_compiled_plan(
     scheduled_close_reason: Optional[str] = None
     scheduled_open_side: Optional[str] = None
     scheduled_open_reason: str = ""
+    compiled_entry_filter_tabs = set(_compiled_safe_entry_filter_tabs(entry_filters, cfg))
+    entry_filter_cfg_map = _normalize_entry_filter_map(dict(entry_filters or {})) if compiled_entry_filter_tabs else {}
+    step_bars = _compiled_step_bars_from_plan(plan, cfg.step_timeframe) if compiled_entry_filter_tabs else pd.DataFrame()
+    pending: Dict[str, Optional[Any]] = {"LONG": None, "SHORT": None}
+    step_counter = 0
 
     def _bar_open_time_ns(row_index: int) -> int:
         try:
             return int(open_time_ns_arr[row_index])
         except Exception:
             return int(idx_ns[row_index])
+
+    def _schedule_compiled_open(side: str, reason: str, fill_index: int) -> bool:
+        nonlocal scheduled_open_side, scheduled_open_reason
+        if int(fill_index) > int(end_i):
+            return False
+        scheduled_open_side = str(side).upper()
+        scheduled_open_reason = str(reason)
+        return True
+
+    def _start_pending_or_schedule(
+        side: str,
+        base_reason: str,
+        signal_time: pd.Timestamp,
+        signal_row: int,
+        current_step: int,
+        matched_group_indices: Optional[List[int]],
+    ) -> bool:
+        side_text = str(side).upper()
+        tab_name = "Long Entry" if side_text == "LONG" else "Short Entry"
+        cfgs_side = _entry_filter_cfgs_for_groups(entry_filter_cfg_map, tab_name, matched_group_indices)
+        sig_bar = _bar_info_at(step_bars, signal_time)
+        decision, detail, confirm_bars = _combine_entry_filter_signal_decisions(side_text, cfgs_side, sig_bar)
+        if decision == "ALLOW":
+            return _schedule_compiled_open(
+                side_text,
+                _format_entry_reason(base_reason, "allowed", detail),
+                int(signal_row) + 1,
+            )
+        if decision == "WAIT" and sig_bar is not None:
+            pending[side_text] = _pending_from_signal(
+                side=side_text,
+                origin="ENTRY",
+                signal_time=signal_time,
+                signal_bar=sig_bar,
+                signal_snapshot=None,
+                signal_snapshot_row_index=int(signal_row),
+                signal_reason=base_reason,
+                signal_rule_trace="",
+                bars_ago={},
+                current_step=int(current_step),
+                confirm_bars=int(confirm_bars),
+                tab_name=tab_name,
+                matched_group_indices=matched_group_indices,
+            )
+        return False
 
     def _close_position(ts_ns: int, fill_price_raw: float, reason: str, *, ambiguous: bool = False, exit_row_index: Optional[int] = None) -> None:
         nonlocal balance, pos_side, qty, entry_price, entry_time_ns, entry_reason, fee_entry
@@ -1327,6 +1418,7 @@ def run_backtest_compiled_plan(
     t0 = time.perf_counter()
     for j in range(start_i, end_i + 1):
         ts_ns = int(idx_ns[j])
+        bar_time = _timestamp_from_ns(ts_ns)
         open_ts_ns = _bar_open_time_ns(j)
 
         bar_open = float(open_arr[j]) if np.isfinite(open_arr[j]) else float(close_arr[j])
@@ -1389,6 +1481,52 @@ def run_backtest_compiled_plan(
             short_entry = bool(short_entry_arr[j])
             short_exit = bool(short_exit_arr[j])
             can_schedule_next = j < end_i
+            long_entry_groups = _matching_group_indices_from_compiled("Long Entry", compiled_group_signals, j, long_entry)
+            short_entry_groups = _matching_group_indices_from_compiled("Short Entry", compiled_group_signals, j, short_entry)
+            current_step = int(step_counter)
+            step_counter += 1
+            consumed_sides: set[str] = set()
+
+            if compiled_entry_filter_tabs and pos_side == 0 and scheduled_open_side is None:
+                due_sides = [side for side, pending_entry in pending.items() if pending_entry is not None and current_step >= int(getattr(pending_entry, "due_step", current_step + 1))]
+                if len(due_sides) == 2 and skip_if_both_entries:
+                    for side in due_sides:
+                        pending[side] = None
+                        consumed_sides.add(side)
+                else:
+                    for side in due_sides:
+                        pending_entry = pending.get(side)
+                        if pending_entry is None or scheduled_open_side is not None:
+                            continue
+                        tab_name = str(getattr(pending_entry, "tab_name", ("Long Entry" if side == "LONG" else "Short Entry")) or ("Long Entry" if side == "LONG" else "Short Entry"))
+                        pending_groups = list(getattr(pending_entry, "matched_group_indices", []) or [])
+                        cfgs_side = _entry_filter_cfgs_for_groups(entry_filter_cfg_map, tab_name, pending_groups)
+                        current_group_indices = long_entry_groups if side == "LONG" else short_entry_groups
+                        setup_still_valid = _setup_still_valid_from_matches(
+                            pending_groups,
+                            current_group_indices,
+                            str(tab_group_join_mode.get(tab_name, "AND") or "AND"),
+                        )
+                        bars_since_signal = max(1, int(current_step) - int(getattr(pending_entry, "signal_step", current_step - 1)))
+                        confirm_decision, detail = _combine_entry_filter_confirm_decisions(
+                            side,
+                            cfgs_side,
+                            getattr(pending_entry, "signal_bar", None),
+                            _bar_info_at(step_bars, bar_time),
+                            setup_still_valid,
+                            bars_since_signal=bars_since_signal,
+                        )
+                        if confirm_decision == "ALLOW":
+                            pending[side] = None
+                            consumed_sides.add(side)
+                            _schedule_compiled_open(
+                                side,
+                                _format_entry_reason(str(getattr(pending_entry, "signal_reason", ("Long Entry" if side == "LONG" else "Short Entry"))), "confirmed", detail, bars_since_signal),
+                                j + 1,
+                            )
+                        elif confirm_decision == "BLOCK":
+                            pending[side] = None
+                            consumed_sides.add(side)
 
             if pos_side > 0:
                 if short_entry and allow_reverse and can_schedule_next:
@@ -1405,15 +1543,29 @@ def run_backtest_compiled_plan(
                 elif short_exit and can_schedule_next:
                     scheduled_close_reason = "Short Exit"
             else:
+                if compiled_entry_filter_tabs:
+                    if long_entry and pending.get("SHORT") is not None and "LONG" not in consumed_sides:
+                        pending["SHORT"] = None
+                    if short_entry and pending.get("LONG") is not None and "SHORT" not in consumed_sides:
+                        pending["LONG"] = None
+
                 if long_entry and short_entry:
                     if not skip_if_both_entries:
                         pass
                 elif long_entry and can_schedule_next:
-                    scheduled_open_side = "LONG"
-                    scheduled_open_reason = "Long Entry"
+                    if "Long Entry" in compiled_entry_filter_tabs:
+                        if "LONG" not in consumed_sides and pending.get("LONG") is None:
+                            _start_pending_or_schedule("LONG", "Long Entry", bar_time, j, current_step, long_entry_groups)
+                    else:
+                        scheduled_open_side = "LONG"
+                        scheduled_open_reason = "Long Entry"
                 elif short_entry and can_schedule_next:
-                    scheduled_open_side = "SHORT"
-                    scheduled_open_reason = "Short Entry"
+                    if "Short Entry" in compiled_entry_filter_tabs:
+                        if "SHORT" not in consumed_sides and pending.get("SHORT") is None:
+                            _start_pending_or_schedule("SHORT", "Short Entry", bar_time, j, current_step, short_entry_groups)
+                    else:
+                        scheduled_open_side = "SHORT"
+                        scheduled_open_reason = "Short Entry"
 
         equity_now = _equity_mark(balance, pos_side, qty, entry_price, bar_close)
         peak_equity = max(float(peak_equity), float(equity_now))
@@ -1550,7 +1702,11 @@ def replay_backtest_compiled_bar(
     if equity_curve_stride is not None:
         next_cfg.equity_curve_stride = max(1, int(equity_curve_stride))
 
-    if _compiled_replay_event_driven_supported(next_cfg, capture_trade_details=capture_trade_details):
+    if _compiled_replay_event_driven_supported(
+        next_cfg,
+        capture_trade_details=capture_trade_details,
+        entry_filters=dict(replay_context.get("entry_filters") or {}),
+    ):
         return run_backtest_compiled_replay_event_driven(
             plan,
             cfg=next_cfg,

@@ -120,6 +120,31 @@ def _active_entry_filter_tabs(entry_filters: Optional[Mapping[str, Any]]) -> Tup
     return tuple(active)
 
 
+def _compiled_safe_entry_filter_tabs(
+    entry_filters: Optional[Mapping[str, Any]],
+    cfg: Optional[BacktestConfig],
+) -> Tuple[str, ...]:
+    normalized = normalize_entry_filter_payload(entry_filters)
+
+    safe_tabs: List[str] = []
+    for tab_name in ENTRY_FILTER_TABS:
+        payload = normalized.get(tab_name, {})
+        default_cfg = payload.get("default", EntryFilterConfig()) if isinstance(payload, dict) else EntryFilterConfig()
+        groups = payload.get("groups", {}) if isinstance(payload, dict) else {}
+        active_group_cfgs = [
+            group_cfg
+            for group_cfg in (groups.values() if isinstance(groups, Mapping) else [])
+            if isinstance(group_cfg, EntryFilterConfig) and group_cfg.is_active()
+        ]
+        if active_group_cfgs:
+            continue
+        if not isinstance(default_cfg, EntryFilterConfig) or not default_cfg.is_active():
+            continue
+        safe_tabs.append(str(tab_name))
+
+    return tuple(safe_tabs)
+
+
 def compile_strategy_plan(
     rules_model: Optional[Mapping[str, Sequence[Sequence[Any]]]],
     *,
@@ -153,11 +178,21 @@ def compile_strategy_plan(
         if _tab_uses_sequence(dict(group_rule_join_mode or {}), tab_name)
     )
     entry_filter_tabs = _active_entry_filter_tabs(entry_filters)
+    compiled_entry_filter_tabs = _compiled_safe_entry_filter_tabs(entry_filters, cfg)
+    if bool(getattr(cfg, "allow_reverse", False)):
+        compiled_entry_filter_tabs = tuple(
+            tab_name
+            for tab_name in compiled_entry_filter_tabs
+            if not (
+                (tab_name == "Long Entry" and "Short Entry" in active_tabs)
+                or (tab_name == "Short Entry" and "Long Entry" in active_tabs)
+            )
+        )
     compiled_sequence_tabs = tuple(
         tab_name
         for tab_name in sequence_tabs
         if _sequence_compile_allowed_for_tab(tab_name, dict(group_rule_join_mode or {}))
-        and tab_name not in entry_filter_tabs
+        and (tab_name not in entry_filter_tabs or tab_name in compiled_entry_filter_tabs)
     )
     compiled_tabs = tuple(
         tab_name
@@ -183,6 +218,14 @@ def compile_strategy_plan(
             notes.append("Sequence groups with active entry filters stay on the generic engine.")
         else:
             notes.append("Sequence groups need stateful generic evaluation.")
+    unsupported_entry_filter_tabs = tuple(
+        tab_name
+        for tab_name in entry_filter_tabs
+        if tab_name in active_tabs and tab_name not in compiled_entry_filter_tabs
+    )
+    if unsupported_entry_filter_tabs:
+        blockers.append("entry_filters")
+        notes.append("Active entry filters require the generic engine unless they match the compiled-safe default-only subset.")
     if stop_mode not in FAST_BAR_EXIT_MODES:
         blockers.append(f"stop_mode:{stop_mode}")
         notes.append(f"Stop-loss mode '{stop_mode}' is not yet supported by the compiled bar engine.")
@@ -192,6 +235,8 @@ def compile_strategy_plan(
 
     engine = FAST_BAR_ENGINE if not blockers else FALLBACK_ENGINE
     if engine == FAST_BAR_ENGINE:
+        if compiled_entry_filter_tabs:
+            notes.append("Default-only active entry filters are handled by the compiled bar full-scan path.")
         notes.append("Rules can be compiled into aligned boolean arrays and executed by the lightweight bar engine.")
 
     return StrategyCompilationPlan(

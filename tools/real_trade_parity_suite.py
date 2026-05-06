@@ -45,8 +45,8 @@ CASES: List[TradeParityCase] = [
         preset="901",
         start="2026-04-20 00:00:00+00:00",
         end="2026-04-20 04:00:00+00:00",
-        expected_engine="legacy_generic",
-        expected_plan_blockers=["sequence_groups"],
+        expected_engine="compiled_bar",
+        expected_plan_blockers=[],
         expected_trades=[
             ExpectedTrade(
                 trade_id=1,

@@ -82,12 +82,59 @@ class FastBacktestTests(unittest.TestCase):
                     "require_next_close_beyond_mid": False,
                     "require_setup_still_valid": False,
                     "apply_to_reversals": True,
+                    "groups": {
+                        "0": {
+                            "enabled": True,
+                            "mode": "RETRACE_ALWAYS",
+                            "expansion_atr_mult": 2.0,
+                            "hard_skip_atr_mult": 0.0,
+                            "confirm_bars": 1,
+                            "reference_range": "FULL_CANDLE",
+                            "touch_type": "WICK",
+                            "min_retrace_pct": 35.0,
+                            "max_retrace_pct": 100.0,
+                            "require_next_close_beyond_mid": False,
+                            "require_setup_still_valid": False,
+                            "apply_to_reversals": True,
+                        }
+                    },
                 }
             },
             backtest_cfg=BacktestConfig(stop_loss_mode="OFF", take_profit_mode="OFF"),
         )
         self.assertEqual(plan.engine, FALLBACK_ENGINE)
-        self.assertIn("sequence_groups", plan.blockers)
+        self.assertIn("entry_filters", plan.blockers)
+
+    def test_strategy_plan_compiles_safe_sequence_with_default_only_entry_filter(self) -> None:
+        rules_model = self._rules_model()
+        plan = compile_strategy_plan(
+            rules_model,
+            tab_group_join_mode={name: "AND" for name in rules_model},
+            group_rule_join_mode={name: (["SEQUENCE"] if name == "Long Entry" else ["OR"]) for name in rules_model},
+            entry_filters={
+                "Long Entry": {
+                    "enabled": True,
+                    "mode": "RETRACE_ALWAYS",
+                    "expansion_atr_mult": 2.0,
+                    "hard_skip_atr_mult": 0.0,
+                    "confirm_bars": 1,
+                    "reference_range": "FULL_CANDLE",
+                    "touch_type": "WICK",
+                    "min_retrace_pct": 35.0,
+                    "max_retrace_pct": 100.0,
+                    "require_next_close_beyond_mid": False,
+                    "require_setup_still_valid": False,
+                    "apply_to_reversals": True,
+                }
+            },
+            backtest_cfg=BacktestConfig(
+                stop_loss_mode="OFF",
+                take_profit_mode="OFF",
+                allow_reverse=False,
+            ),
+        )
+        self.assertEqual(plan.engine, FAST_BAR_ENGINE)
+        self.assertEqual(tuple(plan.blockers), tuple())
 
     def test_compiled_engine_matches_legacy_for_simple_state_rules(self) -> None:
         df = self._sample_stream()
@@ -203,6 +250,94 @@ class FastBacktestTests(unittest.TestCase):
         self.assertTrue(all(pd.notna(trade.net_pnl) for trade in compiled.trades))
         self.assertTrue(pd.notna(compiled.summary["ending_balance"]))
         self.assertTrue(pd.notna(compiled.summary["return_pct"]))
+
+    def test_compiled_engine_matches_legacy_for_sequence_with_default_only_entry_filter(self) -> None:
+        df = self._sample_stream()
+        long_trigger = Rule(timeframe="1m", mode="state", field="macd", op=">", value=0)
+        long_gate = Rule(timeframe="1m", mode="state", field="ms", op="=", value="GREEN")
+        long_exit = Rule(timeframe="1m", mode="state", field="macd", op="<", value=0)
+        rules_model = {
+            "Long Entry": [[long_trigger, long_gate]],
+            "Long Exit": [[long_exit]],
+            "Short Entry": [],
+            "Short Exit": [],
+        }
+        join_mode = {name: "AND" for name in rules_model}
+        group_rule_join_mode = {
+            "Long Entry": ["SEQUENCE"],
+            "Long Exit": ["OR"],
+            "Short Entry": [],
+            "Short Exit": [],
+        }
+        entry_filters = {
+            "Long Entry": {
+                "enabled": True,
+                "mode": "RETRACE_ALWAYS",
+                "expansion_atr_mult": 2.0,
+                "hard_skip_atr_mult": 0.0,
+                "confirm_bars": 3,
+                "reference_range": "FULL_CANDLE",
+                "touch_type": "WICK",
+                "min_retrace_pct": 0.0,
+                "max_retrace_pct": 100.0,
+                "require_next_close_beyond_mid": False,
+                "require_setup_still_valid": False,
+                "apply_to_reversals": True,
+            }
+        }
+        cfg = BacktestConfig(
+            initial_balance=1000.0,
+            order_notional_usdt=100.0,
+            fee_rate=0.0,
+            slippage_bps=0.0,
+            stop_loss_mode="OFF",
+            take_profit_mode="OFF",
+            allow_reverse=False,
+            skip_if_both_entries=True,
+            step_timeframe="1m",
+            capture_trade_details=False,
+            equity_curve_stride=1,
+        )
+
+        plan = compile_strategy_plan(
+            rules_model,
+            tab_group_join_mode=join_mode,
+            group_rule_join_mode=group_rule_join_mode,
+            entry_filters=entry_filters,
+            backtest_cfg=cfg,
+        )
+        self.assertEqual(plan.engine, FAST_BAR_ENGINE)
+
+        legacy = run_backtest(
+            symbol="BTCUSDT",
+            streams_full={"1m": df.copy()},
+            start=df.index[0],
+            end=df.index[-1],
+            rules_model=rules_model,
+            tab_group_join_mode=join_mode,
+            group_rule_join_mode=group_rule_join_mode,
+            cfg=cfg,
+            df_1m_full=df.copy(),
+            entry_filters=entry_filters,
+        )
+        compiled = run_backtest_compiled_bar(
+            symbol="BTCUSDT",
+            streams_full={"1m": df.copy()},
+            start=df.index[0],
+            end=df.index[-1],
+            rules_model=rules_model,
+            tab_group_join_mode=join_mode,
+            group_rule_join_mode=group_rule_join_mode,
+            cfg=cfg,
+            entry_filters=entry_filters,
+        )
+
+        self.assertEqual([t.side for t in compiled.trades], [t.side for t in legacy.trades])
+        self.assertEqual([t.entry_time for t in compiled.trades], [t.entry_time for t in legacy.trades])
+        self.assertEqual([t.exit_time for t in compiled.trades], [t.exit_time for t in legacy.trades])
+        self.assertEqual([t.entry_reason for t in compiled.trades], [t.entry_reason for t in legacy.trades])
+        self.assertEqual([t.exit_reason for t in compiled.trades], [t.exit_reason for t in legacy.trades])
+        self.assertAlmostEqual(float(compiled.summary["ending_balance"]), float(legacy.summary["ending_balance"]), places=8)
 
     def test_compiled_replay_matches_fresh_compiled_run_for_exit_changes(self) -> None:
         df = self._sample_stream()

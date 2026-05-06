@@ -216,7 +216,7 @@ def _batch_case(*, python_exe: str, output_dir: Path) -> Dict[str, Any]:
         _make_check("batch_replay_context_hits", _safe_int(summary.get("replay_context_hits")) == 4, f"replay_context_hits={summary.get('replay_context_hits')}"),
         _make_check("batch_balances_match_expected", all(_approx_equal(balance, EXPECTED_BATCH_BALANCE_901) for balance in balances), f"balances={balances}"),
         _make_check("batch_trade_counts_stable", all(trade == 1 for trade in trades), f"trades={trades}"),
-        _make_check("batch_engines_stable", all(engine == "legacy_generic" for engine in engines), f"engines={engines}"),
+        _make_check("batch_engines_stable", all(engine == "compiled_bar" for engine in engines), f"engines={engines}"),
         _make_check(
             "batch_memory_reuse_reduces_load",
             len(load_secs) >= 2 and load_secs[0] is not None and load_secs[1] is not None and float(load_secs[1]) < float(load_secs[0]),
@@ -314,6 +314,11 @@ def _pullback_variant_case(*, python_exe: str, output_dir: Path) -> Dict[str, An
     best_result = dict(summary.get("best_result") or {})
     variant_names = [str(name or "") for name in list(summary.get("variant_names") or [])]
     top_engines = [str((row or {}).get("strategy_plan_engine") or "") for row in top_results if isinstance(row, dict)]
+    engine_by_variant = {
+        str((row or {}).get("variant") or ""): str((row or {}).get("strategy_plan_engine") or "")
+        for row in top_results
+        if isinstance(row, dict)
+    }
 
     checks = [
         _make_check("pullback_variant_returncode_zero", run["returncode"] == 0, f"returncode={run['returncode']}"),
@@ -328,7 +333,12 @@ def _pullback_variant_case(*, python_exe: str, output_dir: Path) -> Dict[str, An
             f"best_balance={best_result.get('ending_balance')}",
         ),
         _make_check("pullback_variant_best_trades", _safe_int(best_result.get("num_trades")) == 1, f"best_trades={best_result.get('num_trades')}"),
-        _make_check("pullback_variant_generic_path_with_filters", bool(top_engines) and all(engine == "legacy_generic" for engine in top_engines), f"engines={top_engines}"),
+        _make_check("pullback_variant_baseline_compiled", engine_by_variant.get("baseline") == "compiled_bar", f"engines={engine_by_variant}"),
+        _make_check(
+            "pullback_variant_filtered_variants_generic",
+            all(engine_by_variant.get(name) == "legacy_generic" for name in requested_names if name != "baseline"),
+            f"engines={engine_by_variant}",
+        ),
     ]
     return {
         "label": "pullback_variant_probe",

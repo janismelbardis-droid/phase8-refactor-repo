@@ -129,6 +129,24 @@ def _bundle_affinity_key(job: Dict[str, Any]) -> str:
     return json.dumps(_jsonable_value(payload), sort_keys=True, ensure_ascii=False, separators=(",", ":"))
 
 
+def _replay_affinity_key(job: Dict[str, Any], cfg: BacktestConfig) -> str:
+    payload = {
+        "preset_name": str(job.get("preset_name") or ""),
+        "symbol": str(job.get("symbol") or ""),
+        "start": str(job.get("start") or ""),
+        "end": str(job.get("end") or ""),
+        "bundle_affinity_key": str(job.get("bundle_affinity_key") or ""),
+        "step_timeframe": str(getattr(cfg, "step_timeframe", "") or ""),
+        "allow_reverse": bool(getattr(cfg, "allow_reverse", False)),
+        "skip_if_both_entries": bool(getattr(cfg, "skip_if_both_entries", False)),
+        "stop_loss_mode": str(getattr(cfg, "stop_loss_mode", "") or ""),
+        "stop_loss_value": float(getattr(cfg, "stop_loss_value", 0.0) or 0.0),
+        "take_profit_mode": str(getattr(cfg, "take_profit_mode", "") or ""),
+        "take_profit_value": float(getattr(cfg, "take_profit_value", 0.0) or 0.0),
+    }
+    return json.dumps(_jsonable_value(payload), sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+
+
 def _build_cfg(*, args: argparse.Namespace) -> BacktestConfig:
     return BacktestConfig(
         initial_balance=float(args.initial_balance),
@@ -177,6 +195,7 @@ def _run_single_job(
     req_spec: Any,
     preset_warmup: int,
     needed_warmup: int,
+    replay_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     query_warmup = max(0, int(preset_warmup))
     compute_warmup = max(query_warmup, int(needed_warmup or 0))
@@ -210,6 +229,7 @@ def _run_single_job(
         collect_event_activity=False,
         collect_signal_rows=False,
         write_verification_bundle=False,
+        replay_context=replay_context,
     )
     bundle = execution["bundle"]
     summary = execution["summary"]
@@ -236,7 +256,9 @@ def _run_single_job(
         "profit_factor": _safe_float(summary.get("profit_factor")),
         "max_drawdown_pct": _safe_float(summary.get("max_drawdown_pct")),
         "strategy_plan_engine": str(summary.get("strategy_plan_engine", "")),
+        "replay_context_cached": bool(replay_context),
     }
+    row["__next_replay_context"] = execution.get("replay_context")
     print(
         "  "
         + f"bundle={row['bundle_source']}"
@@ -392,9 +414,12 @@ def main() -> int:
     )
 
     rows: List[Dict[str, Any]] = []
+    replay_context_cache: Dict[str, Dict[str, Any]] = {}
     session_started = time.perf_counter()
     total_jobs = len(prepared_jobs)
     for idx, job in enumerate(prepared_jobs, start=1):
+        replay_key = _replay_affinity_key(job, cfg)
+        cached_replay_context = replay_context_cache.get(replay_key)
         row = _run_single_job(
             job_index=idx,
             total_jobs=total_jobs,
@@ -416,9 +441,14 @@ def main() -> int:
             req_spec=job["req_spec"],
             preset_warmup=int(job["preset_warmup"]),
             needed_warmup=int(job["needed_warmup"]),
+            replay_context=cached_replay_context,
         )
         row["repeat_index"] = int(job.get("repeat_index", 0) or 0)
         row["bundle_affinity_key"] = str(job.get("bundle_affinity_key") or "")
+        row["replay_affinity_key"] = replay_key
+        next_replay_context = row.pop("__next_replay_context", None)
+        if isinstance(next_replay_context, dict):
+            replay_context_cache[replay_key] = next_replay_context
         rows.append(row)
 
     wall_sec = time.perf_counter() - session_started
@@ -430,9 +460,11 @@ def main() -> int:
     df.to_csv(output_dir / "jobs.csv", index=False)
 
     memory_hits = int(df["bundle_memory_cached"].fillna(False).astype(bool).sum()) if not df.empty else 0
+    replay_hits = int(df["replay_context_cached"].fillna(False).astype(bool).sum()) if not df.empty else 0
     summary = {
         "jobs": int(len(rows)),
         "memory_cache_hits": int(memory_hits),
+        "replay_context_hits": int(replay_hits),
         "session_wall_sec": round(wall_sec, 4),
         "avg_total_sec": _safe_float(df["total_sec"].mean()) if not df.empty else None,
         "avg_load_sec": _safe_float(df["load_sec"].mean()) if not df.empty else None,

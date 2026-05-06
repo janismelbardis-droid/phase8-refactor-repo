@@ -1449,6 +1449,7 @@ def run_backtest_compiled_bar(
     cfg: BacktestConfig,
     entry_filters: Optional[Mapping[str, Any]] = None,
     streams_already_htf_closed_only: bool = False,
+    replay_context: Optional[Mapping[str, Any]] = None,
 ) -> BacktestResult:
     plan = build_compiled_bar_plan(
         symbol=symbol,
@@ -1471,6 +1472,7 @@ def run_backtest_compiled_bar(
         group_rule_join_mode=group_rule_join_mode,
         entry_filters=entry_filters,
         reuse_compiled_plan=False,
+        replay_context=replay_context,
     )
 
 
@@ -1535,6 +1537,7 @@ def run_backtest_auto(
     df_1m_full: Optional[pd.DataFrame] = None,
     entry_filters: Optional[Mapping[str, Any]] = None,
     apply_htf_closed_only: bool = False,
+    replay_context: Optional[Mapping[str, Any]] = None,
 ) -> BacktestResult:
     plan = compile_strategy_plan(
         rules_model,
@@ -1560,6 +1563,7 @@ def run_backtest_auto(
             cfg=cfg,
             entry_filters=entry_filters,
             streams_already_htf_closed_only=True,
+            replay_context=replay_context,
         )
 
     from .backtest import run_backtest
@@ -1575,6 +1579,7 @@ def run_backtest_auto(
         cfg=cfg,
         df_1m_full=df_1m_full,
         entry_filters=entry_filters,
+        replay_context=(dict(replay_context) if isinstance(replay_context, dict) else None),
     )
     try:
         res.summary["strategy_plan_engine"] = plan.engine

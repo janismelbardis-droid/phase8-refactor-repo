@@ -188,6 +188,7 @@ def _batch_case(*, python_exe: str, output_dir: Path) -> Dict[str, Any]:
         _make_check("batch_jobs_csv_exists", jobs_path.exists(), str(jobs_path)),
         _make_check("batch_job_count", _safe_int(summary.get("jobs")) == 5 and len(rows) == 5, f"summary_jobs={summary.get('jobs')} rows={len(rows)}"),
         _make_check("batch_memory_cache_hits", _safe_int(summary.get("memory_cache_hits")) == 4 and memory_hits == 4, f"summary_hits={summary.get('memory_cache_hits')} row_hits={memory_hits}"),
+        _make_check("batch_replay_context_hits", _safe_int(summary.get("replay_context_hits")) == 4, f"replay_context_hits={summary.get('replay_context_hits')}"),
         _make_check("batch_balances_match_expected", all(_approx_equal(balance, EXPECTED_BATCH_BALANCE_901) for balance in balances), f"balances={balances}"),
         _make_check("batch_trade_counts_stable", all(trade == 1 for trade in trades), f"trades={trades}"),
         _make_check("batch_engines_stable", all(engine == "legacy_generic" for engine in engines), f"engines={engines}"),
@@ -334,7 +335,11 @@ def _write_report(path: Path, payload: Dict[str, Any]) -> None:
         if case_name in {"parity_suite", "trade_parity_suite"}:
             key_result = f"all_passed={summary.get('all_passed')}"
         elif case_name == "batch_repeat5":
-            key_result = f"memory_cache_hits={summary.get('memory_cache_hits')} jobs={summary.get('jobs')}"
+            key_result = (
+                f"memory_cache_hits={summary.get('memory_cache_hits')} "
+                f"replay_context_hits={summary.get('replay_context_hits')} "
+                f"jobs={summary.get('jobs')}"
+            )
         elif case_name in {"entry_filter_probe", "pullback_variant_probe"}:
             best_result = summary.get("best_result", {}) if isinstance(summary.get("best_result"), dict) else {}
             key_result = (

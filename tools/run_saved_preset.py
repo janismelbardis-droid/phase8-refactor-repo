@@ -361,6 +361,7 @@ def execute_saved_preset_job(
     collect_event_activity: bool = True,
     collect_signal_rows: bool = True,
     write_verification_bundle: bool = True,
+    replay_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     job_started = time.perf_counter()
     warmup_start = start - pd.Timedelta(minutes=max(0, int(query_warmup or 0)))
@@ -415,6 +416,7 @@ def execute_saved_preset_job(
             df_1m_full=df_1m,
             entry_filters=entry_filters,
             apply_htf_closed_only=(bt_mode == BACKTEST_MODE_BAR_1M_HTF_CLOSED_ONLY),
+            replay_context=replay_context,
         )
     timing_run_engine_sec = time.perf_counter() - run_started
 
@@ -451,6 +453,7 @@ def execute_saved_preset_job(
         "event_activity": event_activity,
         "signal_rows": signal_rows,
         "verification_bundle": verification_bundle,
+        "replay_context": getattr(res, "replay_context", None),
         "timing_load_bundle_sec": float(timing_load_bundle_sec),
         "timing_run_engine_sec": float(timing_run_engine_sec),
         "timing_job_total_sec": float(time.perf_counter() - job_started),

@@ -807,22 +807,30 @@ def run_backtest(symbol: str,
                  progress_cb=None,
                  df_1m_full: Optional["pd.DataFrame"] = None,
                  entry_filters: Optional[Dict[str, Any]] = None,
+                 replay_context: Optional[Dict[str, Any]] = None,
                  *,
                  capture_trade_details: Optional[bool] = None,
                  equity_curve_stride: Optional[int] = None) -> BacktestResult:
     frozen_streams = _freeze_backtest_streams(streams_full, end=end)
     frozen_df_1m = _freeze_backtest_frame(df_1m_full, end=end)
-    replay_context = build_backtest_replay_context(
-        symbol=symbol,
-        streams_full=frozen_streams,
-        start=start,
-        end=end,
-        rules_model=rules_model,
-        tab_group_join_mode=tab_group_join_mode,
-        group_rule_join_mode=group_rule_join_mode,
-        df_1m_full=frozen_df_1m,
-        entry_filters=entry_filters,
-    )
+    normalized_replay_context: Optional[Dict[str, Any]]
+    if isinstance(replay_context, dict):
+        normalized_replay_context = _normalize_backtest_replay_context(
+            replay_context,
+            preserve_identity=True,
+        )
+    else:
+        normalized_replay_context = build_backtest_replay_context(
+            symbol=symbol,
+            streams_full=frozen_streams,
+            start=start,
+            end=end,
+            rules_model=rules_model,
+            tab_group_join_mode=tab_group_join_mode,
+            group_rule_join_mode=group_rule_join_mode,
+            df_1m_full=frozen_df_1m,
+            entry_filters=entry_filters,
+        )
     return _run_backtest_from_frozen_inputs(
         symbol=symbol,
         streams_full=frozen_streams,
@@ -835,7 +843,7 @@ def run_backtest(symbol: str,
         progress_cb=progress_cb,
         df_1m_full=frozen_df_1m,
         entry_filters=entry_filters,
-        replay_context=replay_context,
+        replay_context=normalized_replay_context,
         capture_trade_details=capture_trade_details,
         equity_curve_stride=equity_curve_stride,
     )

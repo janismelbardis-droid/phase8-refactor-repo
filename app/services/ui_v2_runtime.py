@@ -24,7 +24,6 @@ from app.constants import (
     BACKTEST_MODE_BAR_1M_HTF_CLOSED_ONLY,
     BACKTEST_MODE_TICK,
 )
-from app.data_binance import fetch_klines_1m_futures
 from app.execution_planner import (
     choose_process_batch_plan,
     env_flag as execution_env_flag,
@@ -44,14 +43,7 @@ from app.rsi_settings import (
 )
 from app.ema_pair import build_ema_pair_frame
 from app.fast_backtest import run_backtest_auto
-from app.indicators_streaming import simulate_multitf_indicators
-from app.prepared_dataset import (
-    build_prepared_dataset,
-    find_covering_prepared_dataset_on_disk,
-    save_prepared_dataset_to_disk,
-    slice_df_1m_window,
-    slice_streams_window,
-)
+from app.stream_bundle_loader import load_stream_bundle_library_first
 from app.research.market_context_audit import (
     build_market_context_audit_window,
     build_timeframe_context_summary,
@@ -2255,73 +2247,21 @@ class BacktestRuntimeService:
         rsi_settings: Optional[Any] = None,
         progress_cb: Optional[ProgressCallback] = None,
     ) -> Tuple[pd.DataFrame, Dict[str, pd.DataFrame], bool]:
-        prepared_disk = find_covering_prepared_dataset_on_disk(
-            str(cache_dir),
+        bundle = load_stream_bundle_library_first(
             symbol=symbol,
             start=start,
             end=end,
+            required_fields=required_fields,
             timeframes=timeframes,
+            cache_dir=cache_dir,
             price_source=price_source,
             macd_impl=macd_impl,
             adx_impl=adx_impl,
-            required_fields=required_fields,
             ema_settings=ema_settings,
             rsi_settings=rsi_settings,
-            market_state_thresholds=None,
-        )
-        if prepared_disk is not None:
-            if progress_cb:
-                progress_cb("Loaded prepared dataset from disk.", 100)
-            df_1m = slice_df_1m_window(prepared_disk.df_1m_full, start, end)
-            streams_full = slice_streams_window(prepared_disk.streams_full, start, end, timeframes=timeframes)
-            return df_1m, streams_full, True
-
-        df_1m = fetch_klines_1m_futures(
-            symbol,
-            start,
-            end,
-            str(cache_dir),
             progress_cb=progress_cb,
-            price_source=price_source,
         )
-        if df_1m.empty:
-            raise ValueError("No candles returned for the requested window.")
-
-        streams_full = simulate_multitf_indicators(
-            df_1m,
-            timeframes,
-            progress_cb,
-            macd_impl=macd_impl,
-            adx_impl=adx_impl,
-            cache_dir=str(cache_dir),
-            symbol=symbol,
-            start_utc=start,
-            end_utc=end,
-            price_source=price_source,
-            required_fields=required_fields,
-            ema_settings=ema_settings,
-            rsi_settings=rsi_settings,
-        )
-        try:
-            prepared_entry = build_prepared_dataset(
-                symbol=symbol,
-                start=start,
-                end=end,
-                timeframes=timeframes,
-                price_source=price_source,
-                macd_impl=macd_impl,
-                adx_impl=adx_impl,
-                required_fields=required_fields,
-                ema_settings=ema_settings,
-                rsi_settings=rsi_settings,
-                market_state_thresholds=None,
-                df_1m_full=df_1m,
-                streams_full=streams_full,
-            )
-            save_prepared_dataset_to_disk(str(cache_dir), prepared_entry)
-        except Exception:
-            pass
-        return df_1m, streams_full, False
+        return bundle.df_1m, bundle.streams_full, bundle.source == "local_indicator_store"
 
     def _store_run_artifact(self, preset_name: str, result: BacktestResult, payload: Dict[str, Any], *, run_id: Optional[str] = None) -> str:
         next_run_id = str(run_id or uuid.uuid4())
@@ -3120,74 +3060,22 @@ class BacktestRuntimeService:
         macd_impl = str(settings.get("macd_impl", "TRADINGVIEW") or "TRADINGVIEW").upper()
         adx_impl = str(settings.get("adx_impl", "TRADINGVIEW") or "TRADINGVIEW").upper()
 
-        prepared_disk = find_covering_prepared_dataset_on_disk(
-            str(cache_dir),
+        bundle = load_stream_bundle_library_first(
             symbol=symbol,
             start=warmup_start,
             end=end,
+            required_fields=req_spec,
             timeframes=tfs,
+            cache_dir=cache_dir,
             price_source=price_source,
             macd_impl=macd_impl,
             adx_impl=adx_impl,
-            required_fields=req_spec,
             ema_settings=settings,
             rsi_settings=settings,
-            market_state_thresholds=None,
+            progress_cb=progress,
         )
-        if prepared_disk is not None:
-            progress("Loaded prepared dataset from disk.", 100)
-            df_1m = slice_df_1m_window(prepared_disk.df_1m_full, warmup_start, end)
-            streams_full = slice_streams_window(prepared_disk.streams_full, warmup_start, end, timeframes=tfs)
-        else:
-            progress("Loading candles from cache or exchange...", 5)
-            df_1m = fetch_klines_1m_futures(
-                symbol,
-                warmup_start,
-                end,
-                str(cache_dir),
-                progress_cb=progress,
-                price_source=price_source,
-            )
-            if df_1m.empty:
-                raise ValueError("No candles returned for the requested window.")
-
-            progress("Calculating indicator streams...", 20)
-            streams_full = simulate_multitf_indicators(
-                df_1m,
-                tfs,
-                progress,
-                macd_impl=macd_impl,
-                adx_impl=adx_impl,
-                cache_dir=str(cache_dir),
-                symbol=symbol,
-                start_utc=warmup_start,
-                end_utc=end,
-                price_source=price_source,
-                required_fields=req_spec,
-                ema_settings=settings,
-                rsi_settings=settings,
-            )
-            try:
-                prepared_entry = build_prepared_dataset(
-                    symbol=symbol,
-                    start=warmup_start,
-                    end=end,
-                    timeframes=tfs,
-                    price_source=price_source,
-                    macd_impl=macd_impl,
-                    adx_impl=adx_impl,
-                    required_fields=req_spec,
-                    ema_settings=settings,
-                    rsi_settings=settings,
-                    market_state_thresholds=None,
-                    df_1m_full=df_1m,
-                    streams_full=streams_full,
-                )
-                saved_prepared = save_prepared_dataset_to_disk(str(cache_dir), prepared_entry)
-                if saved_prepared:
-                    progress(f"Saved prepared dataset ({Path(saved_prepared).name}).", 100)
-            except Exception:
-                pass
+        df_1m = bundle.df_1m
+        streams_full = bundle.streams_full
 
         progress("Running backtest engine...", 55)
         if bt_mode == BACKTEST_MODE_TICK:

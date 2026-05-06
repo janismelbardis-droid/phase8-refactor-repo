@@ -533,10 +533,26 @@ def test_simulate_multitf_indicators_persists_exact_and_local_store(tmp_path: Pa
         market_state_thresholds=None,
     )
 
-    assert Path(exact_pq).is_file()
-    assert Path(exact_meta).is_file()
+    assert not Path(exact_pq).is_file()
+    assert not Path(exact_meta).is_file()
     assert Path(day_pq).is_file()
     assert Path(day_meta).is_file()
+
+    streams_exact = simulate_multitf_indicators(
+        df,
+        ["1m"],
+        cache_dir=str(cache_dir),
+        symbol=symbol,
+        start_utc=start_utc,
+        end_utc=end_utc,
+        price_source="LAST",
+        required_fields=None,
+        save_exact_cache=True,
+    )
+
+    assert "1m" in streams_exact
+    assert Path(exact_pq).is_file()
+    assert Path(exact_meta).is_file()
 
 
 def test_simulate_multitf_indicators_ema_profile_changes_cache_identity(tmp_path: Path) -> None:
@@ -597,6 +613,7 @@ def test_simulate_multitf_indicators_ema_profile_changes_cache_identity(tmp_path
         price_source="LAST",
         required_fields=req_fields,
         ema_settings=ema_9_21,
+        save_exact_cache=True,
     )
 
     assert "1m" in streams

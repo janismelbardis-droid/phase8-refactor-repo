@@ -18,18 +18,11 @@ if str(REPO_ROOT) not in sys.path:
 from app.backtest_models import BacktestConfig
 from app.backtest_frames import make_streams_htf_closed_only
 from app.constants import BACKTEST_MODE_BAR_1M_HTF_CLOSED_ONLY
-from app.data_binance import binance_fapi_server_time_utc, fetch_klines_1m_futures
+from app.data_binance import binance_fapi_server_time_utc
 from app.ema_settings import normalize_ema_settings
 from app.fast_backtest import run_backtest_auto
-from app.indicators_streaming import simulate_multitf_indicators
-from app.prepared_dataset import (
-    build_prepared_dataset,
-    find_covering_prepared_dataset_on_disk,
-    save_prepared_dataset_to_disk,
-    slice_df_1m_window,
-    slice_streams_window,
-)
 from app.rules import Rule
+from app.stream_bundle_loader import load_stream_bundle_library_first
 from app.strategy_requirements import StreamRequirementSpec, compile_stream_requirements
 from app.utils_time import parse_utc, required_warmup_minutes
 
@@ -685,68 +678,31 @@ def _prepare_streams(
     aggregate_rules = _aggregate_rules(candidates)
     base_cfg = _cfg(profiles[0], order_notional=100.0, fee_pct=0.04, slippage_bps=0.0)
     req_spec = compile_stream_requirements(aggregate_rules, backtest_cfg=base_cfg, include_plot_defaults=True)
-    warmup = required_warmup_minutes(list(timeframes), required_fields=req_spec, ema_settings=ema_settings)
-    warmup_start = start - pd.Timedelta(minutes=int(warmup))
+    indicator_warmup = required_warmup_minutes(list(timeframes), required_fields=req_spec, ema_settings=ema_settings)
+    query_warmup = 0
+    compute_warmup = max(query_warmup, int(indicator_warmup))
+    warmup_start = start - pd.Timedelta(minutes=int(query_warmup))
+    compute_start = start - pd.Timedelta(minutes=int(compute_warmup))
 
-    prepared = find_covering_prepared_dataset_on_disk(
-        str(cache_dir),
+    bundle = load_stream_bundle_library_first(
         symbol=symbol,
         start=warmup_start,
         end=end,
+        compute_start=compute_start,
         timeframes=list(timeframes),
+        cache_dir=cache_dir,
         price_source="LAST",
         macd_impl="TRADINGVIEW",
         adx_impl="TRADINGVIEW",
         required_fields=req_spec,
         ema_settings=ema_settings,
-        market_state_thresholds=None,
+        progress_cb=None,
     )
-    if prepared is not None:
-        print(f"loaded prepared dataset for EMA {ema_fast}/{ema_slow}", flush=True)
-        return (
-            slice_df_1m_window(prepared.df_1m_full, warmup_start, end),
-            slice_streams_window(prepared.streams_full, warmup_start, end, timeframes=list(timeframes)),
-            req_spec,
-            int(warmup),
-        )
-
-    df_1m = fetch_klines_1m_futures(symbol, warmup_start, end, str(cache_dir), price_source="LAST")
-    if df_1m.empty:
-        raise ValueError(f"No candles returned for {symbol} {warmup_start} -> {end}")
-    streams = simulate_multitf_indicators(
-        df_1m,
-        list(timeframes),
-        macd_impl="TRADINGVIEW",
-        adx_impl="TRADINGVIEW",
-        cache_dir=str(cache_dir),
-        symbol=symbol,
-        start_utc=warmup_start,
-        end_utc=end,
-        price_source="LAST",
-        required_fields=req_spec,
-        ema_settings=ema_settings,
-    )
-    try:
-        entry = build_prepared_dataset(
-            symbol=symbol,
-            start=warmup_start,
-            end=end,
-            timeframes=list(timeframes),
-            price_source="LAST",
-            macd_impl="TRADINGVIEW",
-            adx_impl="TRADINGVIEW",
-            required_fields=req_spec,
-            ema_settings=ema_settings,
-            market_state_thresholds=None,
-            df_1m_full=df_1m,
-            streams_full=streams,
-        )
-        saved = save_prepared_dataset_to_disk(str(cache_dir), entry)
-        if saved:
-            print(f"saved prepared dataset: {Path(saved).name}", flush=True)
-    except Exception as exc:
-        print(f"warning: prepared dataset save skipped: {exc}", flush=True)
-    return df_1m, streams, req_spec, int(warmup)
+    if bundle.source == "local_indicator_store":
+        print(f"loaded local indicator store for EMA {ema_fast}/{ema_slow}", flush=True)
+    else:
+        print(f"built indicator streams for EMA {ema_fast}/{ema_slow}", flush=True)
+    return bundle.df_1m, bundle.streams_full, req_spec, int(query_warmup)
 
 
 def run(args: argparse.Namespace) -> int:

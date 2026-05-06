@@ -17,16 +17,14 @@ from app.fast_backtest import (
     _compiled_replay_plan,
     build_compiled_bar_plan,
 )
-from app.prepared_dataset import (
-    find_covering_prepared_dataset_on_disk,
-    slice_df_1m_window,
-    slice_streams_window,
-)
+from app.stream_bundle_loader import load_stream_bundle_library_first
 from app.strategy_compiler import FAST_BAR_ENGINE
 from app.strategy_requirements import compile_stream_requirements
 
 _WORKER_REPLAY_SOURCE: Optional[Dict[str, Any]] = None
 _WORKER_BASE_CFG: Optional[BacktestConfig] = None
+_CPU_INFO_CACHE_FAST: Optional[Dict[str, Optional[int]]] = None
+_CPU_INFO_CACHE_EXACT: Optional[Dict[str, Optional[int]]] = None
 
 AUTO_COMBOS_PER_PHYSICAL_WORKER = 24
 AUTO_COMBOS_PER_LOGICAL_WORKER = 48
@@ -49,8 +47,18 @@ def compact_compiled_worker_replay_context(replay_context: Mapping[str, Any]) ->
     return compact
 
 
-def detect_cpu_counts() -> Dict[str, Optional[int]]:
+def detect_cpu_counts(*, fast: bool = True) -> Dict[str, Optional[int]]:
+    global _CPU_INFO_CACHE_FAST, _CPU_INFO_CACHE_EXACT
+    if fast and _CPU_INFO_CACHE_FAST is not None:
+        return dict(_CPU_INFO_CACHE_FAST)
+    if (not fast) and _CPU_INFO_CACHE_EXACT is not None:
+        return dict(_CPU_INFO_CACHE_EXACT)
+
     logical = max(1, int(os.cpu_count() or 1))
+    if fast:
+        _CPU_INFO_CACHE_FAST = {"logical": int(logical), "physical": None}
+        return dict(_CPU_INFO_CACHE_FAST)
+
     physical: Optional[int] = None
 
     if sys.platform.startswith("win"):
@@ -77,10 +85,12 @@ def detect_cpu_counts() -> Dict[str, Optional[int]]:
     if physical is not None:
         physical = max(1, min(int(physical), logical))
 
-    return {
+    payload = {
         "logical": int(logical),
         "physical": int(physical) if physical is not None else None,
     }
+    _CPU_INFO_CACHE_EXACT = payload
+    return dict(payload)
 
 
 def choose_auto_workers(combo_count: int, *, logical_cpus: int, physical_cpus: Optional[int] = None) -> int:
@@ -154,23 +164,20 @@ def init_worker_compiled_replay_state(spec_payload: Mapping[str, Any], base_cfg_
         backtest_cfg=cfg,
         include_plot_defaults=True,
     )
-    prepared_disk = find_covering_prepared_dataset_on_disk(
-        cache_dir,
+    bundle = load_stream_bundle_library_first(
         symbol=symbol,
         start=warmup_start,
         end=end,
         timeframes=tfs,
+        cache_dir=Path(cache_dir),
         price_source=str(spec.get("price_source") or "LAST").upper(),
         macd_impl=str(spec.get("macd_impl") or "TRADINGVIEW").upper(),
         adx_impl=str(spec.get("adx_impl") or "TRADINGVIEW").upper(),
         required_fields=req_spec,
-        market_state_thresholds=None,
+        progress_cb=None,
     )
-    if prepared_disk is None:
-        raise ValueError("Prepared dataset is missing for compiled replay worker bootstrap.")
-
-    df_1m = slice_df_1m_window(prepared_disk.df_1m_full, warmup_start, end)
-    streams_full = slice_streams_window(prepared_disk.streams_full, warmup_start, end, timeframes=tfs)
+    df_1m = bundle.df_1m
+    streams_full = bundle.streams_full
     transformed_streams = dict(streams_full or {})
     if bool(spec.get("apply_htf_closed_only")):
         transformed_streams = make_streams_htf_closed_only(transformed_streams)

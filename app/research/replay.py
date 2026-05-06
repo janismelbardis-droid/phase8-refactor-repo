@@ -166,6 +166,8 @@ def extract_backtest_replay_context(result: Any) -> Optional[Dict[str, Any]]:
         ctx = result.get("replay_context")
     else:
         ctx = None
+    if isinstance(ctx, dict):
+        return ctx
     return coerce_mapping(ctx) or None
 
 

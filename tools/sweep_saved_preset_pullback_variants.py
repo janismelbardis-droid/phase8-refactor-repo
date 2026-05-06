@@ -14,19 +14,13 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from app.backtest import make_streams_htf_closed_only, run_backtest, run_backtest_tick
+from app.backtest import make_streams_htf_closed_only, run_backtest_tick
 from app.backtest_models import BacktestConfig
 from app.constants import BACKTEST_MODE_BAR_1M_HTF_CLOSED_ONLY, BACKTEST_MODE_TICK
-from app.data_binance import binance_fapi_server_time_utc, fetch_klines_1m_futures
-from app.indicators_streaming import simulate_multitf_indicators
-from app.prepared_dataset import (
-    build_prepared_dataset,
-    find_covering_prepared_dataset_on_disk,
-    save_prepared_dataset_to_disk,
-    slice_df_1m_window,
-    slice_streams_window,
-)
+from app.data_binance import binance_fapi_server_time_utc
+from app.fast_backtest import run_backtest_auto
 from app.rules import EntryFilterConfig, Rule
+from app.stream_bundle_loader import load_stream_bundle_library_first
 from app.strategy_requirements import compile_stream_requirements
 from app.utils_time import parse_utc, required_warmup_minutes
 from tools.run_saved_preset import (
@@ -121,6 +115,15 @@ def _variant_library() -> List[Tuple[str, List[Rule], List[Rule]]]:
     ]
 
 
+def _parse_variant_names(raw: str) -> List[str]:
+    names: List[str] = []
+    for chunk in str(raw or "").split(","):
+        text = str(chunk or "").strip()
+        if text:
+            names.append(text)
+    return names
+
+
 def _result_row(res: Any, *, variant: str) -> Dict[str, Any]:
     summary = dict(getattr(res, "summary", {}) or {})
     trades_count = summary.get("num_trades", summary.get("trades", len(getattr(res, "trades", []) or [])))
@@ -134,6 +137,7 @@ def _result_row(res: Any, *, variant: str) -> Dict[str, Any]:
         "profit_factor": float(summary.get("profit_factor", float("nan"))),
         "max_drawdown": float(summary.get("max_drawdown", float("nan"))),
         "max_drawdown_pct": float(summary.get("max_drawdown_pct", float("nan"))),
+        "strategy_plan_engine": str(summary.get("strategy_plan_engine", "")),
         "stop_loss_count": int(summary.get("stop_loss_count", 0) or 0),
         "take_profit_count": int(summary.get("take_profit_count", 0) or 0),
         "filter_created": int(ef_stats.get("created", 0) or 0),
@@ -190,6 +194,8 @@ def main() -> int:
     parser.add_argument("--objective", default="ending_balance", choices=["ending_balance", "return_pct", "profit_factor"])
     parser.add_argument("--top-n", type=int, default=10)
     parser.add_argument("--output-dir", default=None)
+    parser.add_argument("--show-server-time", action="store_true", default=False)
+    parser.add_argument("--variant-names", default=None, help="Optional comma-separated subset of variant names to evaluate.")
     args = parser.parse_args()
 
     payload = _load_presets(Path(args.presets_file).resolve())
@@ -239,6 +245,13 @@ def main() -> int:
     )
 
     variant_defs = _variant_library()
+    if str(args.variant_names or "").strip():
+        requested_names = _parse_variant_names(str(args.variant_names))
+        if requested_names:
+            allowed = set(requested_names)
+            variant_defs = [item for item in variant_defs if str(item[0]) in allowed]
+            if not variant_defs:
+                raise ValueError("No pullback variants matched --variant-names.")
     req_spec = compile_stream_requirements(
         _append_entry_rules(base_rules_model, variant_defs[-1][1], variant_defs[-1][2]),
         entry_filters=baseline_entry_filters,
@@ -248,8 +261,10 @@ def main() -> int:
 
     preset_warmup = int(settings.get("warmup_min", 0) or 0)
     needed_warmup = required_warmup_minutes(tfs, required_fields=req_spec)
-    warmup = max(preset_warmup, int(needed_warmup or 0))
-    warmup_start = start - pd.Timedelta(minutes=warmup)
+    query_warmup = max(0, int(preset_warmup))
+    compute_warmup = max(query_warmup, int(needed_warmup or 0))
+    warmup_start = start - pd.Timedelta(minutes=query_warmup)
+    compute_start = start - pd.Timedelta(minutes=compute_warmup)
 
     cache_dir = _resolve_cache_dir(repo_root, args.cache_dir or str(settings.get("cache_dir", "data_cache") or "data_cache"))
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -264,7 +279,11 @@ def main() -> int:
     print(f"Window UTC: {start} -> {end}", flush=True)
     print(f"Mode: {bt_mode}", flush=True)
     print(f"Cache dir: {cache_dir}", flush=True)
-    print(f"Warmup minutes: preset={preset_warmup}, required={needed_warmup}, used={warmup}", flush=True)
+    print(
+        f"Warmup minutes: preset={preset_warmup}, indicator_required={needed_warmup}, "
+        f"query_used={query_warmup}, compute_used={compute_warmup}",
+        flush=True,
+    )
     print(f"Variants: {len(variant_defs)}", flush=True)
     print(
         "Fixed execution setup: "
@@ -276,62 +295,26 @@ def main() -> int:
         flush=True,
     )
 
-    srv = binance_fapi_server_time_utc()
-    if srv is not None:
-        print(f"Binance server time (UTC): {srv}", flush=True)
+    if bool(args.show_server_time):
+        srv = binance_fapi_server_time_utc()
+        if srv is not None:
+            print(f"Binance server time (UTC): {srv}", flush=True)
 
-    prepared_disk = find_covering_prepared_dataset_on_disk(
-        str(cache_dir),
+    bundle = load_stream_bundle_library_first(
         symbol=symbol,
         start=warmup_start,
         end=end,
+        compute_start=compute_start,
         timeframes=tfs,
+        cache_dir=cache_dir,
         price_source=price_source,
         macd_impl=macd_impl,
         adx_impl=adx_impl,
         required_fields=req_spec,
-        market_state_thresholds=None,
+        progress_cb=_progress,
     )
-    if prepared_disk is not None:
-        _progress("Loaded prepared dataset from disk.", 100)
-        df_1m = slice_df_1m_window(prepared_disk.df_1m_full, warmup_start, end)
-        streams_full = slice_streams_window(prepared_disk.streams_full, warmup_start, end, timeframes=tfs)
-    else:
-        df_1m = fetch_klines_1m_futures(symbol, warmup_start, end, str(cache_dir), progress_cb=_progress, price_source=price_source)
-        if df_1m.empty:
-            raise ValueError("No candles returned for the requested window.")
-        streams_full = simulate_multitf_indicators(
-            df_1m,
-            tfs,
-            _progress,
-            macd_impl=macd_impl,
-            adx_impl=adx_impl,
-            cache_dir=str(cache_dir),
-            symbol=symbol,
-            start_utc=warmup_start,
-            end_utc=end,
-            price_source=price_source,
-            required_fields=req_spec,
-        )
-        try:
-            prepared_entry = build_prepared_dataset(
-                symbol=symbol,
-                start=warmup_start,
-                end=end,
-                timeframes=tfs,
-                price_source=price_source,
-                macd_impl=macd_impl,
-                adx_impl=adx_impl,
-                required_fields=req_spec,
-                market_state_thresholds=None,
-                df_1m_full=df_1m,
-                streams_full=streams_full,
-            )
-            saved_prepared = save_prepared_dataset_to_disk(str(cache_dir), prepared_entry)
-            if saved_prepared:
-                _progress(f"Saved prepared dataset ({Path(saved_prepared).name}).", 100)
-        except Exception:
-            pass
+    df_1m = bundle.df_1m
+    streams_full = bundle.streams_full
 
     streams_bt = streams_full
     if bt_mode == BACKTEST_MODE_BAR_1M_HTF_CLOSED_ONLY:
@@ -364,20 +347,18 @@ def main() -> int:
                 macd_impl=macd_impl,
             )
         else:
-            res = run_backtest(
+            res = run_backtest_auto(
                 symbol=symbol,
                 streams_full=streams_bt,
-                df_1m_full=df_1m,
                 start=start,
                 end=end,
                 rules_model=rules_model,
                 tab_group_join_mode=tab_group_join_mode,
                 group_rule_join_mode=group_rule_join_mode,
-                entry_filters=entry_filters,
                 cfg=cfg,
-                progress_cb=None,
-                capture_trade_details=cfg.capture_trade_details,
-                equity_curve_stride=cfg.equity_curve_stride,
+                df_1m_full=df_1m,
+                entry_filters=entry_filters,
+                apply_htf_closed_only=False,
             )
         rows.append(_result_row(res, variant=variant_name))
         results_by_variant[variant_name] = res
@@ -427,6 +408,7 @@ def main() -> int:
         "take_profit_value": float(args.take_profit_value),
         "take_profit_timeframe": str(args.take_profit_timeframe),
         "take_profit_field": str(args.take_profit_field),
+        "variant_names": [str(name) for name, _long_rules, _short_rules in variant_defs],
         "top_results": top_rows,
         "best_result": best_row,
         "best_verification_bundle": str(bundle_dir),

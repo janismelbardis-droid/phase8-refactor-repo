@@ -22,7 +22,7 @@ from .rules import (
 from .utils_time import datetime_like_to_epoch_ms, interval_to_ms
 from .data_binance import iter_aggtrades_futures_daily
 from .indicators_streaming import compute_live_indicators, ema_tradingview
-from .strategy_requirements import compile_stream_requirements, RANGE_FILTER_FIELDS
+from .strategy_requirements import RANGE_FILTER_FIELDS
 
 
 from .backtest_models import (
@@ -560,6 +560,106 @@ def _bool_true(x: Optional[bool]) -> bool:
     return x is True
 
 
+def _snapshot_keys_for_rule_field(field_name: Any) -> List[str]:
+    fld = str(field_name or "").strip()
+    if not fld:
+        return []
+    keys: List[str] = [fld]
+    if fld == "ms_cross":
+        keys.extend(["macd", "signal"])
+    elif fld == "macd0_cross":
+        keys.append("macd")
+    elif fld == "di_cross":
+        keys.extend(["di_plus", "di_minus"])
+    elif fld in ("frama_break_up", "frama_break_down", "frama_mid_cross"):
+        keys.extend(["frama_state", "frama_break_up", "frama_break_down", "frama_mid_cross", "frama_trigger_side"])
+    elif fld in ("vidya_new_liq_low", "vidya_new_liq_high"):
+        keys.extend(["vidya_active_liq_low_count", "vidya_active_liq_high_count"])
+    elif fld in ("range_filter_buy", "range_filter_sell"):
+        keys.extend(["range_filter_state", "range_filter_cond_ini"])
+    deduped: List[str] = []
+    for key in keys:
+        text = str(key or "").strip()
+        if text and text not in deduped:
+            deduped.append(text)
+    return deduped
+
+
+def _compare_to_field_name(compare_to: Any) -> str:
+    if isinstance(compare_to, dict):
+        raw = compare_to.get("field", compare_to.get("name", ""))
+    else:
+        raw = compare_to
+    text = str(raw or "").strip()
+    if text.endswith("]") and "[" in text:
+        text = text.rpartition("[")[0].strip()
+    return text
+
+
+def _minimal_snapshot_required_fields(rules_model: Dict[str, List[List["Rule"]]]) -> List[str]:
+    fields: set[str] = set()
+    try:
+        for groups in (rules_model or {}).values():
+            for group in (groups or []):
+                for rule in (group or []):
+                    for key in _snapshot_keys_for_rule_field(getattr(rule, "field", "")):
+                        if key:
+                            fields.add(str(key))
+                    compare_field = _compare_to_field_name(getattr(rule, "compare_to", None))
+                    if compare_field:
+                        for key in _snapshot_keys_for_rule_field(compare_field):
+                            if key:
+                                fields.add(str(key))
+    except Exception:
+        return []
+    return sorted(str(field).strip() for field in fields if str(field).strip())
+
+
+def _replay_eval_snapshot_signature(
+    *,
+    step_tf: str,
+    subs: Dict[str, "pd.DataFrame"],
+    required_fields: Optional[List[str]],
+) -> Tuple[Any, ...]:
+    tf_shapes = tuple(
+        (str(tf), int(len(dft)))
+        for tf, dft in sorted((subs or {}).items(), key=lambda item: str(item[0]))
+        if dft is not None
+    )
+    fields = tuple(
+        sorted(
+            str(field).strip()
+            for field in (required_fields or [])
+            if str(field).strip()
+        )
+    )
+    return ("eval_snapshot_pairs_v1", str(step_tf or ""), tf_shapes, fields)
+
+
+def _replay_eval_snapshot_pair_cache(
+    replay_context: Optional[Dict[str, Any]],
+    *,
+    step_tf: str,
+    subs: Dict[str, "pd.DataFrame"],
+    required_fields: Optional[List[str]],
+) -> Optional[Dict[int, Tuple[Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]]]]]:
+    if not isinstance(replay_context, dict):
+        return None
+    signature = _replay_eval_snapshot_signature(
+        step_tf=step_tf,
+        subs=subs,
+        required_fields=required_fields,
+    )
+    cache_key = "__eval_snapshot_pair_cache"
+    sig_key = "__eval_snapshot_pair_cache_signature"
+    existing_cache = replay_context.get(cache_key)
+    if replay_context.get(sig_key) != signature or not isinstance(existing_cache, dict):
+        existing_cache = {}
+        replay_context[sig_key] = signature
+        replay_context[cache_key] = existing_cache
+    return existing_cache
+
+
 def _entry_group_results_for_tab(
     tab_name: str,
     rules_model: Dict[str, List[List["Rule"]]],
@@ -747,7 +847,10 @@ def run_backtest_replay(replay_context: Mapping[str, Any],
                         *,
                         capture_trade_details: Optional[bool] = None,
                         equity_curve_stride: Optional[int] = None) -> BacktestResult:
-    normalized = _normalize_backtest_replay_context(replay_context)
+    normalized = _normalize_backtest_replay_context(
+        replay_context,
+        preserve_identity=isinstance(replay_context, dict),
+    )
     return _run_backtest_from_frozen_inputs(
         symbol=normalized["symbol"],
         streams_full=normalized["streams_full"],
@@ -816,16 +919,16 @@ def _run_backtest_from_frozen_inputs(symbol: str,
             continue
         subs[tf] = dft.iloc[range_start:range_end + 1]
 
-    eval_req_spec = compile_stream_requirements(
-        rules_model,
-        entry_filters=entry_filters,
-        backtest_cfg=cfg,
-        include_plot_defaults=False,
-    )
-    eval_required_fields = eval_req_spec.normalized_fields(include_defaults=True)
+    eval_required_fields = _minimal_snapshot_required_fields(rules_model)
     eval_snapshot_cache = _RowSnapshotCache(required_fields=eval_required_fields, max_rows_per_tf=1024)
     full_snapshot_cache = _RowSnapshotCache(required_fields=None, max_rows_per_tf=128)
-    range_audit_enabled = bool(set(eval_required_fields) & set(RANGE_FILTER_FIELDS))
+    replay_eval_snapshot_pairs = _replay_eval_snapshot_pair_cache(
+        replay_context,
+        step_tf=step_tf,
+        subs=subs,
+        required_fields=eval_required_fields,
+    )
+    range_audit_enabled = bool((replay_context or {}).get("__enable_range_audit")) and bool(set(eval_required_fields) & set(RANGE_FILTER_FIELDS))
     default_eval_impl = str(getattr(eval_tab_generic, "__module__", "")) == "app.rules"
     active_tabs = {
         "Long Entry": bool(rules_model.get("Long Entry")) or (not default_eval_impl),
@@ -896,7 +999,29 @@ def _run_backtest_from_frozen_inputs(symbol: str,
     }
     compiled_tab_signals: Dict[str, np.ndarray] = {}
     compiled_group_signals: Dict[str, List[np.ndarray]] = {}
-    if default_eval_impl:
+    cached_compiled_ok = False
+    if default_eval_impl and isinstance(replay_context, dict):
+        try:
+            cache_range_start = int(replay_context.get("__compiled_cache_range_start"))
+            cache_range_end = int(replay_context.get("__compiled_cache_range_end"))
+            cache_len_1m = int(replay_context.get("__compiled_cache_len_1m"))
+            raw_tab_cache = replay_context.get("__compiled_tab_signals_cache")
+            raw_group_cache = replay_context.get("__compiled_group_signals_cache")
+            if (
+                cache_range_start == int(range_start)
+                and cache_range_end == int(range_end)
+                and cache_len_1m == int(len(subs["1m"]))
+                and isinstance(raw_tab_cache, dict)
+                and isinstance(raw_group_cache, dict)
+            ):
+                compiled_tab_signals = raw_tab_cache
+                compiled_group_signals = raw_group_cache
+                cached_compiled_ok = True
+        except Exception:
+            compiled_tab_signals = {}
+            compiled_group_signals = {}
+            cached_compiled_ok = False
+    if default_eval_impl and not cached_compiled_ok:
         try:
             compiled_tab_signals = _compile_tab_signal_arrays(
                 rules_model,
@@ -918,6 +1043,15 @@ def _run_backtest_from_frozen_inputs(symbol: str,
             )
         except Exception:
             compiled_group_signals = {}
+        if isinstance(replay_context, dict):
+            try:
+                replay_context["__compiled_tab_signals_cache"] = compiled_tab_signals
+                replay_context["__compiled_group_signals_cache"] = compiled_group_signals
+                replay_context["__compiled_cache_range_start"] = int(range_start)
+                replay_context["__compiled_cache_range_end"] = int(range_end)
+                replay_context["__compiled_cache_len_1m"] = int(len(subs["1m"]))
+            except Exception:
+                pass
     prev_decision_j: Optional[int] = None
     step_counter: int = 0
 
@@ -1395,15 +1529,28 @@ def _run_backtest_from_frozen_inputs(symbol: str,
             nonlocal cur_by_tf, prev_by_tf, eval_snapshots_ready
             if eval_snapshots_ready or not do_eval:
                 return
-            cur_by_tf, prev_by_tf = _build_eval_snapshots_for_row(
-                subs,
-                row_index=j,
-                prev_decision_j=prev_decision_before,
-                prev_source_row_by_tf=prev_source_row_by_tf,
-                step_tf=step_tf,
-                snapshot_cache=eval_snapshot_cache,
-                required_fields=eval_required_fields,
-            )
+            cached_pair = None
+            if replay_eval_snapshot_pairs is not None:
+                cached_pair = replay_eval_snapshot_pairs.get(int(j))
+            if (
+                isinstance(cached_pair, tuple)
+                and len(cached_pair) == 2
+                and isinstance(cached_pair[0], dict)
+                and isinstance(cached_pair[1], dict)
+            ):
+                cur_by_tf, prev_by_tf = cached_pair
+            else:
+                cur_by_tf, prev_by_tf = _build_eval_snapshots_for_row(
+                    subs,
+                    row_index=j,
+                    prev_decision_j=prev_decision_before,
+                    prev_source_row_by_tf=prev_source_row_by_tf,
+                    step_tf=step_tf,
+                    snapshot_cache=eval_snapshot_cache,
+                    required_fields=eval_required_fields,
+                )
+                if replay_eval_snapshot_pairs is not None:
+                    replay_eval_snapshot_pairs[int(j)] = (cur_by_tf, prev_by_tf)
             ctx.step_index = int(cur_step_index if cur_step_index is not None else 0)
             try:
                 ctx.observe(cur_by_tf)
@@ -1753,11 +1900,37 @@ def _run_backtest_from_frozen_inputs(symbol: str,
 
     if pos is not None:
         t = subs["1m"].index[-1]
-        price = float(price_series.iloc[-1])
+        final_price = float("nan")
+        try:
+            final_price = float(price_series.iloc[-1])
+        except Exception:
+            final_price = float("nan")
+        if not np.isfinite(final_price):
+            try:
+                final_price = float(fallback_close.iloc[-1])
+            except Exception:
+                final_price = float("nan")
+        if not np.isfinite(final_price):
+            try:
+                final_price = float(subs["1m"]["close"].iloc[-1])
+            except Exception:
+                final_price = float("nan")
+        if not np.isfinite(final_price):
+            try:
+                final_price = float(subs["1m"]["open"].iloc[-1])
+            except Exception:
+                final_price = float("nan")
+        if not np.isfinite(final_price):
+            try:
+                final_price = float(exec_open_prices[-1])
+            except Exception:
+                final_price = float("nan")
+        if not np.isfinite(final_price):
+            raise ValueError("Unable to determine a valid final OHLCV close price for force-close.")
         cur_by_tf = _build_current_snapshots_for_row(subs, len(subs["1m"]) - 1, snapshot_cache=full_snapshot_cache, required_fields=None)
         _close_now(
             fill_time=t,
-            fill_price=price,
+            fill_price=final_price,
             close_reason="Force Close (End)",
             exit_snapshot=_full_current_snapshots(),
             exit_barsago={},
@@ -2248,16 +2421,10 @@ def run_backtest_tick(symbol: str,
         trace_map: Dict[int, Dict[str, str]] = {}
         trace_snapshot_map: Dict[int, Tuple[Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]]]] = {}
         trace_ctx_map: Dict[int, RuleEvalContext] = {}
-        eval_req_spec = compile_stream_requirements(
-            rules_model,
-            entry_filters=entry_filters,
-            backtest_cfg=cfg,
-            include_plot_defaults=True,
-        )
-        eval_required_fields = eval_req_spec.normalized_fields(include_defaults=True)
+        eval_required_fields = _minimal_snapshot_required_fields(rules_model)
         eval_snapshot_cache = _RowSnapshotCache(required_fields=eval_required_fields, max_rows_per_tf=1024)
         full_snapshot_cache = _RowSnapshotCache(required_fields=None, max_rows_per_tf=128)
-        range_audit_enabled = bool(set(eval_required_fields) & set(RANGE_FILTER_FIELDS))
+        range_audit_enabled = bool((replay_context or {}).get("__enable_range_audit")) and bool(set(eval_required_fields) & set(RANGE_FILTER_FIELDS))
         default_eval_impl = str(getattr(eval_tab_generic, "__module__", "")) == "app.rules"
         active_tabs = {
             "Long Entry": bool(rules_model.get("Long Entry")) or (not default_eval_impl),
@@ -2317,6 +2484,12 @@ def run_backtest_tick(symbol: str,
             pass
         range_audit_rows: List[Dict[str, Any]] = []
         subs_tick = {tf: streams_full.get(tf) for tf in used_tfs if streams_full.get(tf) is not None and not streams_full.get(tf).empty}
+        replay_eval_snapshot_pairs = _replay_eval_snapshot_pair_cache(
+            replay_context,
+            step_tf=step_tf,
+            subs=subs_tick,
+            required_fields=eval_required_fields,
+        )
         for j in range(prep_start, end_pos + 1):
             if not bool(decision_mask[j]):
                 continue
@@ -2332,15 +2505,28 @@ def run_backtest_tick(symbol: str,
                 nonlocal cur_by_tf, prev_by_tf, eval_snapshots_ready
                 if eval_snapshots_ready:
                     return
-                cur_by_tf, prev_by_tf = _build_eval_snapshots_for_row(
-                    subs_tick,
-                    row_index=j,
-                    prev_decision_j=prev_decision_before,
-                    prev_source_row_by_tf=prev_source_row_by_tf,
-                    step_tf=step_tf,
-                    snapshot_cache=eval_snapshot_cache,
-                    required_fields=eval_required_fields,
-                )
+                cached_pair = None
+                if replay_eval_snapshot_pairs is not None:
+                    cached_pair = replay_eval_snapshot_pairs.get(int(j))
+                if (
+                    isinstance(cached_pair, tuple)
+                    and len(cached_pair) == 2
+                    and isinstance(cached_pair[0], dict)
+                    and isinstance(cached_pair[1], dict)
+                ):
+                    cur_by_tf, prev_by_tf = cached_pair
+                else:
+                    cur_by_tf, prev_by_tf = _build_eval_snapshots_for_row(
+                        subs_tick,
+                        row_index=j,
+                        prev_decision_j=prev_decision_before,
+                        prev_source_row_by_tf=prev_source_row_by_tf,
+                        step_tf=step_tf,
+                        snapshot_cache=eval_snapshot_cache,
+                        required_fields=eval_required_fields,
+                    )
+                    if replay_eval_snapshot_pairs is not None:
+                        replay_eval_snapshot_pairs[int(j)] = (cur_by_tf, prev_by_tf)
                 ctx.step_index = int(cur_step_index)
                 try:
                     ctx.observe(cur_by_tf)

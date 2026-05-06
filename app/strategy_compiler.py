@@ -168,9 +168,6 @@ def compile_strategy_plan(
     if sequence_tabs:
         blockers.append("sequence_groups")
         notes.append("Sequence groups need stateful generic evaluation.")
-    if entry_filter_tabs:
-        blockers.append("entry_filters")
-        notes.append("Active execution-side entry filters need the generic engine for now.")
     if stop_mode not in FAST_BAR_EXIT_MODES:
         blockers.append(f"stop_mode:{stop_mode}")
         notes.append(f"Stop-loss mode '{stop_mode}' is not yet supported by the compiled bar engine.")

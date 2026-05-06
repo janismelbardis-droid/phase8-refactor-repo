@@ -5,6 +5,7 @@ import json
 import math
 from pathlib import Path
 import sys
+import time
 from typing import Any, Dict, List, Tuple
 
 import pandas as pd
@@ -21,15 +22,8 @@ from app.constants import (
     BACKTEST_MODE_BAR_1M_HTF_CLOSED_ONLY,
     BACKTEST_MODE_TICK,
 )
-from app.data_binance import binance_fapi_server_time_utc, fetch_klines_1m_futures
-from app.indicators_streaming import simulate_multitf_indicators
-from app.prepared_dataset import (
-    build_prepared_dataset,
-    find_covering_prepared_dataset_on_disk,
-    save_prepared_dataset_to_disk,
-    slice_df_1m_window,
-    slice_streams_window,
-)
+from app.data_binance import binance_fapi_server_time_utc
+from app.stream_bundle_loader import load_stream_bundle_library_first
 from app.rules import EntryFilterConfig, Rule
 from app.strategy_requirements import compile_stream_requirements
 from app.utils_time import parse_utc, required_warmup_minutes
@@ -342,6 +336,127 @@ def _write_verification_bundle(
     return bundle_dir
 
 
+def execute_saved_preset_job(
+    *,
+    repo_root: Path,
+    preset_name: str,
+    symbol: str,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    tfs: List[str],
+    cache_dir: Path,
+    bt_mode: str,
+    price_source: str,
+    macd_impl: str,
+    adx_impl: str,
+    rules_model: Dict[str, Any],
+    tab_group_join_mode: Dict[str, str],
+    group_rule_join_mode: Dict[str, List[str]],
+    entry_filters: Dict[str, Any],
+    cfg: BacktestConfig,
+    req_spec: Any,
+    query_warmup: int,
+    compute_warmup: int,
+    progress_cb: Any = None,
+    collect_event_activity: bool = True,
+    collect_signal_rows: bool = True,
+    write_verification_bundle: bool = True,
+) -> Dict[str, Any]:
+    job_started = time.perf_counter()
+    warmup_start = start - pd.Timedelta(minutes=max(0, int(query_warmup or 0)))
+    compute_start = start - pd.Timedelta(minutes=max(0, int(compute_warmup or 0)))
+
+    load_started = time.perf_counter()
+    bundle = load_stream_bundle_library_first(
+        symbol=symbol,
+        start=warmup_start,
+        end=end,
+        compute_start=compute_start,
+        required_fields=req_spec,
+        timeframes=tfs,
+        cache_dir=cache_dir,
+        price_source=price_source,
+        macd_impl=macd_impl,
+        adx_impl=adx_impl,
+        progress_cb=progress_cb,
+    )
+    timing_load_bundle_sec = time.perf_counter() - load_started
+    df_1m = bundle.df_1m
+    streams_full = bundle.streams_full
+
+    run_started = time.perf_counter()
+    if bt_mode == BACKTEST_MODE_TICK:
+        res = run_backtest_tick(
+            symbol=symbol,
+            df_1m_full=df_1m,
+            start=start,
+            end=end,
+            tfs=tfs,
+            rules_model=rules_model,
+            tab_group_join_mode=tab_group_join_mode,
+            group_rule_join_mode=group_rule_join_mode,
+            entry_filters=entry_filters,
+            cfg=cfg,
+            cache_dir=str(cache_dir),
+            progress_cb=progress_cb,
+            streams_full=streams_full,
+            macd_impl=macd_impl,
+        )
+    else:
+        res = run_backtest_auto(
+            symbol=symbol,
+            streams_full=streams_full,
+            start=start,
+            end=end,
+            rules_model=rules_model,
+            tab_group_join_mode=tab_group_join_mode,
+            group_rule_join_mode=group_rule_join_mode,
+            cfg=cfg,
+            df_1m_full=df_1m,
+            entry_filters=entry_filters,
+            apply_htf_closed_only=(bt_mode == BACKTEST_MODE_BAR_1M_HTF_CLOSED_ONLY),
+        )
+    timing_run_engine_sec = time.perf_counter() - run_started
+
+    summary = dict(res.summary or {})
+
+    need_event_activity = bool(collect_event_activity or write_verification_bundle)
+    need_signal_rows = bool(collect_signal_rows or write_verification_bundle)
+    event_activity = _event_activity_summary(rules_model, streams_full, start, end) if need_event_activity else {}
+    signal_rows = _event_signal_rows(rules_model, streams_full, start, end) if need_signal_rows else []
+
+    verification_bundle = None
+    if bool(write_verification_bundle):
+        verification_bundle = _write_verification_bundle(
+            repo_root=repo_root,
+            preset_name=preset_name,
+            symbol=symbol,
+            start=start,
+            end=end,
+            bt_mode=bt_mode,
+            cache_dir=cache_dir,
+            cfg=cfg,
+            summary=summary,
+            event_activity=event_activity,
+            signal_rows=signal_rows,
+            res=res,
+        )
+
+    return {
+        "bundle": bundle,
+        "df_1m": df_1m,
+        "streams_full": streams_full,
+        "result": res,
+        "summary": summary,
+        "event_activity": event_activity,
+        "signal_rows": signal_rows,
+        "verification_bundle": verification_bundle,
+        "timing_load_bundle_sec": float(timing_load_bundle_sec),
+        "timing_run_engine_sec": float(timing_run_engine_sec),
+        "timing_job_total_sec": float(time.perf_counter() - job_started),
+    }
+
+
 def main() -> int:
     repo_root = REPO_ROOT
     default_presets = repo_root / "app" / "presets.json"
@@ -374,6 +489,7 @@ def main() -> int:
     parser.add_argument("--capture-trade-details", action="store_true", default=False)
     parser.add_argument("--equity-curve-stride", type=int, default=15)
     parser.add_argument("--output-json", default=None, help="Optional path to save the backtest summary and a small trade sample.")
+    parser.add_argument("--show-server-time", action="store_true", default=False, help="Print Binance server time before the run.")
     args = parser.parse_args()
 
     presets_file = Path(args.presets_file).resolve()
@@ -436,8 +552,8 @@ def main() -> int:
 
     preset_warmup = int(settings.get("warmup_min", 0) or 0)
     needed_warmup = required_warmup_minutes(tfs, required_fields=req_spec)
-    warmup = max(preset_warmup, int(needed_warmup or 0))
-    warmup_start = start - pd.Timedelta(minutes=warmup)
+    query_warmup = max(0, int(preset_warmup))
+    compute_warmup = max(query_warmup, int(needed_warmup or 0))
 
     cache_dir = _resolve_cache_dir(repo_root, args.cache_dir or str(settings.get("cache_dir", "data_cache") or "data_cache"))
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -450,7 +566,11 @@ def main() -> int:
     print(f"Preset: {preset_name}", flush=True)
     print(f"Symbol: {symbol}", flush=True)
     print(f"Window UTC: {start} -> {end}", flush=True)
-    print(f"Warmup minutes: preset={preset_warmup}, required={needed_warmup}, used={warmup}", flush=True)
+    print(
+        f"Warmup minutes: preset={preset_warmup}, indicator_required={needed_warmup}, "
+        f"query_used={query_warmup}, compute_used={compute_warmup}",
+        flush=True,
+    )
     print(f"Mode: {bt_mode}", flush=True)
     print(f"Cache dir: {cache_dir}", flush=True)
     print(
@@ -464,122 +584,43 @@ def main() -> int:
         flush=True,
     )
 
-    srv = binance_fapi_server_time_utc()
-    if srv is not None:
-        print(f"Binance server time (UTC): {srv}", flush=True)
+    if bool(args.show_server_time):
+        srv = binance_fapi_server_time_utc()
+        if srv is not None:
+            print(f"Binance server time (UTC): {srv}", flush=True)
 
-    prepared_disk = find_covering_prepared_dataset_on_disk(
-        str(cache_dir),
-        symbol=symbol,
-        start=warmup_start,
-        end=end,
-        timeframes=tfs,
-        price_source=price_source,
-        macd_impl=macd_impl,
-        adx_impl=adx_impl,
-        required_fields=req_spec,
-        market_state_thresholds=None,
-    )
-    if prepared_disk is not None:
-        _progress("Loaded prepared dataset from disk.", 100)
-        df_1m = slice_df_1m_window(prepared_disk.df_1m_full, warmup_start, end)
-        streams_full = slice_streams_window(prepared_disk.streams_full, warmup_start, end, timeframes=tfs)
-    else:
-        df_1m = fetch_klines_1m_futures(
-            symbol,
-            warmup_start,
-            end,
-            str(cache_dir),
-            progress_cb=_progress,
-            price_source=price_source,
-        )
-        if df_1m.empty:
-            raise ValueError("No candles returned for the requested window.")
+    if bt_mode == BACKTEST_MODE_BAR_1M_HTF_CLOSED_ONLY:
+        _progress("Planning backtest engine and preparing rule-specific streams...", 0)
 
-        streams_full = simulate_multitf_indicators(
-            df_1m,
-            tfs,
-            _progress,
-            macd_impl=macd_impl,
-            adx_impl=adx_impl,
-            cache_dir=str(cache_dir),
-            symbol=symbol,
-            start_utc=warmup_start,
-            end_utc=end,
-            price_source=price_source,
-            required_fields=req_spec,
-        )
-        try:
-            prepared_entry = build_prepared_dataset(
-                symbol=symbol,
-                start=warmup_start,
-                end=end,
-                timeframes=tfs,
-                price_source=price_source,
-                macd_impl=macd_impl,
-                adx_impl=adx_impl,
-                required_fields=req_spec,
-                market_state_thresholds=None,
-                df_1m_full=df_1m,
-                streams_full=streams_full,
-            )
-            saved_prepared = save_prepared_dataset_to_disk(str(cache_dir), prepared_entry)
-            if saved_prepared:
-                _progress(f"Saved prepared dataset ({Path(saved_prepared).name}).", 100)
-        except Exception:
-            pass
-
-    if bt_mode == BACKTEST_MODE_TICK:
-        res = run_backtest_tick(
-            symbol=symbol,
-            df_1m_full=df_1m,
-            start=start,
-            end=end,
-            tfs=tfs,
-            rules_model=rules_model,
-            tab_group_join_mode=tab_group_join_mode,
-            group_rule_join_mode=group_rule_join_mode,
-            entry_filters=entry_filters,
-            cfg=cfg,
-            cache_dir=str(cache_dir),
-            progress_cb=_progress,
-            streams_full=streams_full,
-            macd_impl=macd_impl,
-        )
-    else:
-        if bt_mode == BACKTEST_MODE_BAR_1M_HTF_CLOSED_ONLY:
-            _progress("Planning backtest engine and preparing rule-specific streams...", 0)
-        res = run_backtest_auto(
-            symbol=symbol,
-            streams_full=streams_full,
-            start=start,
-            end=end,
-            rules_model=rules_model,
-            tab_group_join_mode=tab_group_join_mode,
-            group_rule_join_mode=group_rule_join_mode,
-            cfg=cfg,
-            df_1m_full=df_1m,
-            entry_filters=entry_filters,
-            apply_htf_closed_only=(bt_mode == BACKTEST_MODE_BAR_1M_HTF_CLOSED_ONLY),
-        )
-
-    summary = dict(res.summary or {})
-    event_activity = _event_activity_summary(rules_model, streams_full, start, end)
-    signal_rows = _event_signal_rows(rules_model, streams_full, start, end)
-    bundle_dir = _write_verification_bundle(
+    execution = execute_saved_preset_job(
         repo_root=repo_root,
         preset_name=preset_name,
         symbol=symbol,
         start=start,
         end=end,
-        bt_mode=bt_mode,
+        tfs=tfs,
         cache_dir=cache_dir,
+        bt_mode=bt_mode,
+        price_source=price_source,
+        macd_impl=macd_impl,
+        adx_impl=adx_impl,
+        rules_model=rules_model,
+        tab_group_join_mode=tab_group_join_mode,
+        group_rule_join_mode=group_rule_join_mode,
+        entry_filters=entry_filters,
         cfg=cfg,
-        summary=summary,
-        event_activity=event_activity,
-        signal_rows=signal_rows,
-        res=res,
+        req_spec=req_spec,
+        query_warmup=query_warmup,
+        compute_warmup=compute_warmup,
+        progress_cb=_progress,
+        collect_event_activity=True,
+        collect_signal_rows=True,
+        write_verification_bundle=True,
     )
+    res = execution["result"]
+    summary = execution["summary"]
+    event_activity = execution["event_activity"]
+    bundle_dir = execution["verification_bundle"]
     print("", flush=True)
     print("Summary", flush=True)
     for key in [
@@ -639,7 +680,8 @@ def main() -> int:
             "symbol": symbol,
             "start": str(start),
             "end": str(end),
-            "warmup_minutes": warmup,
+            "warmup_minutes": query_warmup,
+            "compute_warmup_minutes": compute_warmup,
             "cache_dir": str(cache_dir),
             "config": {
                 "allow_reverse": bool(cfg.allow_reverse),

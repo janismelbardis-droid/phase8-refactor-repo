@@ -170,7 +170,11 @@ def _apply_trade_reporting_metrics(summary: Dict[str, Any], trades: List[Trade])
 
 
 
-def _normalize_backtest_replay_context(replay_context: Mapping[str, Any]) -> Dict[str, Any]:
+def _normalize_backtest_replay_context(
+    replay_context: Mapping[str, Any],
+    *,
+    preserve_identity: bool = False,
+) -> Dict[str, Any]:
     if not isinstance(replay_context, Mapping):
         raise TypeError("replay_context must be a mapping")
 
@@ -183,7 +187,7 @@ def _normalize_backtest_replay_context(replay_context: Mapping[str, Any]) -> Dic
     if pd.isna(start) or pd.isna(end):
         raise ValueError("replay_context must include valid UTC-normalizable start/end timestamps.")
 
-    return {
+    normalized = {
         "symbol": str(replay_context.get("symbol") or ""),
         "streams_full": streams_full,
         "start": pd.Timestamp(start),
@@ -194,9 +198,22 @@ def _normalize_backtest_replay_context(replay_context: Mapping[str, Any]) -> Dic
         "df_1m_full": replay_context.get("df_1m_full"),
         "entry_filters": copy.deepcopy(replay_context.get("entry_filters")),
     }
-
-
-
+    for key in (
+        "__compiled_tab_signals_cache",
+        "__compiled_group_signals_cache",
+        "__compiled_cache_range_start",
+        "__compiled_cache_range_end",
+        "__compiled_cache_len_1m",
+        "__eval_snapshot_pair_cache",
+        "__eval_snapshot_pair_cache_signature",
+    ):
+        if key in replay_context:
+            normalized[key] = replay_context.get(key)
+    if preserve_identity and isinstance(replay_context, dict):
+        replay_context.update(normalized)
+        return replay_context
+    return normalized
+ 
 def build_backtest_replay_context(symbol: str,
                                   streams_full: Dict[str, pd.DataFrame],
                                   start: pd.Timestamp,

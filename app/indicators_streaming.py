@@ -33,6 +33,7 @@ from .strategy_requirements import (
     ADX_FIELDS,
     EMA_FIELDS,
     ATR_FIELDS,
+    DEFAULT_FIELDS,
     FAMILY_EMA,
     FAMILY_RSI,
     FRAMA_FIELDS,
@@ -45,6 +46,7 @@ from .strategy_requirements import (
     STOCH_RSI_FIELDS,
     TAKER_BIAS_FIELDS,
     VIDYA_FIELDS,
+    StreamRequirementSpec,
     feature_signature,
     normalize_required_families,
     normalize_required_fields,
@@ -6317,11 +6319,35 @@ _INDICATOR_CACHE_VALIDATION_FIELDS = frozenset(
 )
 
 
+def _indicator_field_available_in_df(df: "pd.DataFrame", field_s: str) -> bool:
+    if not isinstance(df, pd.DataFrame):
+        return False
+    if field_s in df.columns:
+        if field_s in OHLCV_FIELDS:
+            try:
+                return bool(pd.to_numeric(df[field_s], errors="coerce").notna().any())
+            except Exception:
+                try:
+                    return bool(df[field_s].notna().any())
+                except Exception:
+                    return False
+        return True
+    # Some rule fields are derived from base series at evaluation time and are
+    # intentionally not persisted as standalone cache columns.
+    if field_s == "ms_cross":
+        return "macd" in df.columns and "signal" in df.columns
+    if field_s == "macd0_cross":
+        return "macd" in df.columns
+    if field_s == "di_cross":
+        return "di_plus" in df.columns and "di_minus" in df.columns
+    return False
+
+
 def _indicator_streams_have_required_fields(
     streams: Optional[Dict[str, "pd.DataFrame"]],
     required_fields: Optional[Any],
 ) -> bool:
-    req_fields = set(normalize_required_fields(required_fields, include_defaults=True))
+    req_fields = set(_indicator_cache_requested_fields(required_fields) or set())
     req_fields &= set(_INDICATOR_CACHE_VALIDATION_FIELDS)
     if not req_fields:
         return True
@@ -6331,25 +6357,87 @@ def _indicator_streams_have_required_fields(
         found = False
         field_s = str(field).strip()
         for df in streams.values():
-            if not isinstance(df, pd.DataFrame):
-                continue
-            if field_s not in df.columns:
-                continue
-            if field_s in OHLCV_FIELDS:
-                try:
-                    if not pd.to_numeric(df[field_s], errors="coerce").notna().any():
-                        continue
-                except Exception:
-                    try:
-                        if not df[field_s].notna().any():
-                            continue
-                    except Exception:
-                        continue
-            found = True
-            break
+            if _indicator_field_available_in_df(df, field_s):
+                found = True
+                break
         if not found:
             return False
     return True
+
+
+_INDICATOR_DERIVED_FIELD_DEPENDENCIES = {
+    "ms_cross": {"macd", "signal"},
+    "macd0_cross": {"macd"},
+    "di_cross": {"di_plus", "di_minus"},
+}
+
+
+def _indicator_cache_requested_fields(required_fields: Optional[Any]) -> Optional[set[str]]:
+    if required_fields is None:
+        return None
+    if isinstance(required_fields, StreamRequirementSpec):
+        if bool(required_fields.requires_full_stream) or bool(required_fields.unknown_fields):
+            requested = {
+                str(field).strip()
+                for field in normalize_required_fields(required_fields, include_defaults=True)
+                if str(field).strip()
+            }
+        else:
+            requested = {
+                str(field).strip()
+                for field in set(required_fields.required_fields or set())
+                if str(field).strip()
+            }
+            requested.update(str(field).strip() for field in DEFAULT_FIELDS if str(field).strip())
+            if not requested and required_fields.required_families:
+                requested = {
+                    str(field).strip()
+                    for field in normalize_required_fields(set(required_fields.required_families), include_defaults=True)
+                    if str(field).strip()
+                }
+    else:
+        requested = {
+            str(field).strip()
+            for field in normalize_required_fields(required_fields, include_defaults=True)
+            if str(field).strip()
+        }
+    expanded = set(requested)
+    for field in list(requested):
+        expanded.update(_INDICATOR_DERIVED_FIELD_DEPENDENCIES.get(field, set()))
+    return expanded
+
+
+def _indicator_cache_wide_columns(meta: Dict[str, Any], *, required_fields: Optional[Any]) -> Optional[List[str]]:
+    requested_fields = _indicator_cache_requested_fields(required_fields)
+    if requested_fields is None:
+        return None
+    try:
+        tfs = [str(tf).strip() for tf in list(meta.get("timeframes") or []) if str(tf).strip()]
+    except Exception:
+        tfs = []
+    if not tfs:
+        return None
+    cols: List[str] = []
+    seen: set[str] = set()
+    for tf in tfs:
+        prefix = f"{tf}__"
+        for field in requested_fields:
+            for candidate in (str(field), f"{field}_i"):
+                wide_col = prefix + candidate
+                if wide_col in seen:
+                    continue
+                seen.add(wide_col)
+                cols.append(wide_col)
+    return cols or None
+
+
+def _existing_parquet_columns(pq_path: str) -> Optional[set[str]]:
+    try:
+        import pyarrow.parquet as pq  # type: ignore
+        schema = pq.ParquetFile(pq_path).schema
+        return {str(name) for name in list(schema.names or []) if str(name).strip()}
+    except Exception:
+        return None
 
 
 LOCAL_INDICATOR_STORE_VERSION = 1
@@ -6550,7 +6638,7 @@ def _load_local_indicator_store_window(
         )
         if (not os.path.isfile(pq_path)) or (not os.path.isfile(meta_path)):
             return None
-        loaded = _load_indicator_cache(pq_path, meta_path)
+        loaded = _load_indicator_cache(pq_path, meta_path, required_fields=required_fields)
         if loaded is None:
             return None
         pieces.append(loaded)
@@ -6872,7 +6960,7 @@ def _materialize_local_indicator_store_days(
             rsi_settings=rsi_settings,
             market_state_thresholds=market_state_thresholds,
         )
-        loaded = None if (not os.path.isfile(pq_path)) or (not os.path.isfile(meta_path)) else _load_indicator_cache(pq_path, meta_path)
+        loaded = None if (not os.path.isfile(pq_path)) or (not os.path.isfile(meta_path)) else _load_indicator_cache(pq_path, meta_path, required_fields=required_fields)
         if loaded is None or not _indicator_streams_have_required_fields(loaded, required_fields):
             missing_days.append(day)
 
@@ -7036,7 +7124,7 @@ def _materialize_local_indicator_store_days(
         "task_reports": task_reports,
     }
 
-def _load_indicator_cache(pq_path: str, meta_path: str) -> Optional[Dict[str, "pd.DataFrame"]]:
+def _load_indicator_cache(pq_path: str, meta_path: str, *, required_fields: Optional[Any] = None) -> Optional[Dict[str, "pd.DataFrame"]]:
     if (not os.path.isfile(pq_path)) or (not os.path.isfile(meta_path)):
         return None
     try:
@@ -7047,8 +7135,15 @@ def _load_indicator_cache(pq_path: str, meta_path: str) -> Optional[Dict[str, "p
     except Exception:
         return None
 
+    wide_columns = _indicator_cache_wide_columns(meta, required_fields=required_fields)
+    if wide_columns is not None:
+        existing_columns = _existing_parquet_columns(pq_path)
+        if existing_columns:
+            wide_columns = [col for col in wide_columns if str(col) in existing_columns]
+        if not wide_columns:
+            wide_columns = None
     try:
-        wide = pd.read_parquet(pq_path)
+        wide = pd.read_parquet(pq_path, columns=wide_columns)
     except Exception:
         try:
             wide = pd.read_pickle(pq_path)
@@ -7062,6 +7157,8 @@ def _load_indicator_cache(pq_path: str, meta_path: str) -> Optional[Dict[str, "p
     wide.index = idx
 
     streams: Dict[str, pd.DataFrame] = {}
+    requested_fields = _indicator_cache_requested_fields(required_fields)
+
     try:
         tfs = list(meta.get("timeframes") or [])
     except Exception:
@@ -7073,6 +7170,16 @@ def _load_indicator_cache(pq_path: str, meta_path: str) -> Optional[Dict[str, "p
             continue
         sub = wide[cols].copy()
         sub.columns = [str(c)[len(prefix):] for c in cols]
+        if requested_fields is not None:
+            wanted_subcols = set()
+            for field in requested_fields:
+                wanted_subcols.add(field)
+                wanted_subcols.add(f"{field}_i")
+            keep_cols = [c for c in sub.columns if c in wanted_subcols]
+            if keep_cols:
+                sub = sub[keep_cols].copy()
+            else:
+                sub = sub.iloc[:, 0:0].copy()
 
         # Decode to expected stream columns
         try:
@@ -7586,7 +7693,7 @@ def simulate_multitf_indicators(
             ema_settings=ema_settings,
             rsi_settings=rsi_settings,
         )
-        cached = _load_indicator_cache(pq, meta_path)
+        cached = _load_indicator_cache(pq, meta_path, required_fields=required_fields)
         timings["exact_cache_lookup_sec"] = float(time.perf_counter() - lookup_started)
         if cached is not None and _indicator_streams_have_required_fields(cached, required_fields):
             if progress_cb:
@@ -7612,7 +7719,7 @@ def simulate_multitf_indicators(
         timings["covering_cache_lookup_sec"] = float(time.perf_counter() - covering_started)
         if covering is not None:
             cover_pq, cover_meta_path, _cover_meta = covering
-            cover_streams = _load_indicator_cache(cover_pq, cover_meta_path)
+            cover_streams = _load_indicator_cache(cover_pq, cover_meta_path, required_fields=required_fields)
             if cover_streams is not None and _indicator_streams_have_required_fields(cover_streams, required_fields):
                 sliced_streams = _slice_stream_cache_window(cover_streams, start_utc, end_utc)
                 if progress_cb:

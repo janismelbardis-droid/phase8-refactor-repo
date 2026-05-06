@@ -16,6 +16,16 @@ from .taker_bias import compute_taker_bias_payload
 from .utils_time import interval_to_ms
 
 
+_SEQUENCE_PARTITION_CACHE: Dict[Tuple[int, ...], Tuple[Tuple["Rule", ...], Tuple["Rule", ...], Tuple["Rule", ...]]] = {}
+_TRIGGER_FILTER_PARTITION_CACHE: Dict[Tuple[int, ...], Tuple[Tuple["Rule", ...], Tuple["Rule", ...]]] = {}
+
+
+def _rules_identity_key(rules: List["Rule"]) -> Tuple[int, ...]:
+    try:
+        return tuple(int(id(rule)) for rule in list(rules or []))
+    except Exception:
+        return tuple()
+
 
 @dataclass
 class EntryFilterConfig:
@@ -2420,8 +2430,12 @@ def eval_rule_generic(rule: "Rule",
 
         return fired_now
 
-def sequence_rule_partition_full(rules: List["Rule"]) -> Tuple[List["Rule"], List["Rule"], List["Rule"]]:
+def sequence_rule_partition_full(rules: List["Rule"]) -> Tuple[Tuple["Rule", ...], Tuple["Rule", ...], Tuple["Rule", ...]]:
     """Split a SEQUENCE group into ordered steps, final-bar gates, and cancelers."""
+    cache_key = _rules_identity_key(rules)
+    cached = _SEQUENCE_PARTITION_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
     seq_rules: List["Rule"] = []
     gate_rules: List["Rule"] = []
     cancel_rules: List["Rule"] = []
@@ -2432,13 +2446,36 @@ def sequence_rule_partition_full(rules: List["Rule"]) -> Tuple[List["Rule"], Lis
             gate_rules.append(rule)
         else:
             seq_rules.append(rule)
-    return seq_rules, gate_rules, cancel_rules
+    result = (tuple(seq_rules), tuple(gate_rules), tuple(cancel_rules))
+    _SEQUENCE_PARTITION_CACHE[cache_key] = result
+    return result
 
 
-def sequence_rule_partition(rules: List["Rule"]) -> Tuple[List["Rule"], List["Rule"]]:
+def sequence_rule_partition(rules: List["Rule"]) -> Tuple[Tuple["Rule", ...], Tuple["Rule", ...]]:
     """Split a SEQUENCE group into ordered steps and final-bar gate filters."""
     seq_rules, gate_rules, _cancel_rules = sequence_rule_partition_full(rules)
     return seq_rules, gate_rules
+
+
+def trigger_filter_partition(rules: List["Rule"]) -> Tuple[Tuple["Rule", ...], Tuple["Rule", ...]]:
+    cache_key = _rules_identity_key(rules)
+    cached = _TRIGGER_FILTER_PARTITION_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+    triggers: List["Rule"] = []
+    filters: List["Rule"] = []
+    for rule in list(rules or []):
+        try:
+            is_trigger = bool(getattr(rule, "is_trigger", False)) and str(getattr(rule, "mode", "") or "").lower() == "event"
+        except Exception:
+            is_trigger = False
+        if is_trigger:
+            triggers.append(rule)
+        else:
+            filters.append(rule)
+    result = (tuple(triggers), tuple(filters))
+    _TRIGGER_FILTER_PARTITION_CACHE[cache_key] = result
+    return result
 
 
 def _entry_sequence_side_from_group_key(group_key: Any) -> Optional[str]:
@@ -2691,8 +2728,7 @@ def eval_group_generic(rules: List["Rule"], join_mode: str,
         ctx.sequence_last_eval_result_by_group[group_key] = result
         return result
 
-    triggers = [r for r in rules if getattr(r, "is_trigger", False) and r.mode == "event"]
-    filters = [r for r in rules if r not in triggers]
+    triggers, filters = trigger_filter_partition(rules)
 
     # No triggers -> classic behavior over entire group
     if not triggers:

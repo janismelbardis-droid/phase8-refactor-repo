@@ -16,17 +16,9 @@ if str(REPO_ROOT) not in sys.path:
 from app.backtest import run_backtest
 from app.backtest_models import BacktestConfig
 from app.fast_backtest import run_backtest_compiled_bar
-from app.prepared_dataset import (
-    build_prepared_dataset,
-    find_covering_prepared_dataset_on_disk,
-    save_prepared_dataset_to_disk,
-    slice_df_1m_window,
-    slice_streams_window,
-)
+from app.stream_bundle_loader import load_stream_bundle_library_first
 from app.strategy_compiler import compile_strategy_plan
 from app.utils_time import parse_utc, required_warmup_minutes
-from app.indicators_streaming import simulate_multitf_indicators
-from app.data_binance import fetch_klines_1m_futures
 from app.strategy_requirements import compile_stream_requirements
 from tools.run_saved_preset import _load_presets, _materialize_preset, _pick_preset_name, _resolve_cache_dir
 
@@ -63,8 +55,11 @@ def _load_windowed_streams(
         include_plot_defaults=False,
     )
     preset_warmup = int(settings.get("warmup_min", 0) or 0)
-    warmup = max(preset_warmup, int(required_warmup_minutes(tfs, required_fields=req_spec) or 0))
-    warmup_start = start - pd.Timedelta(minutes=warmup)
+    indicator_warmup = int(required_warmup_minutes(tfs, required_fields=req_spec) or 0)
+    query_warmup = max(0, preset_warmup)
+    compute_warmup = max(query_warmup, indicator_warmup)
+    warmup_start = start - pd.Timedelta(minutes=query_warmup)
+    compute_start = start - pd.Timedelta(minutes=compute_warmup)
 
     cache_dir = _resolve_cache_dir(repo_root, cache_dir_arg or str(settings.get("cache_dir", "data_cache") or "data_cache"))
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -72,50 +67,23 @@ def _load_windowed_streams(
     macd_impl = str(settings.get("macd_impl", "TRADINGVIEW") or "TRADINGVIEW").upper()
     adx_impl = str(settings.get("adx_impl", "TRADINGVIEW") or "TRADINGVIEW").upper()
 
-    prepared = find_covering_prepared_dataset_on_disk(
-        str(cache_dir),
+    bundle = load_stream_bundle_library_first(
         symbol=symbol,
         start=warmup_start,
         end=end,
+        compute_start=compute_start,
+        required_fields=req_spec,
         timeframes=tfs,
+        cache_dir=cache_dir,
         price_source=price_source,
         macd_impl=macd_impl,
         adx_impl=adx_impl,
-        required_fields=req_spec,
-        market_state_thresholds=None,
+        progress_cb=_progress,
     )
-    if prepared is None:
-        df_1m = fetch_klines_1m_futures(symbol, warmup_start, end, str(cache_dir), progress_cb=_progress, price_source=price_source)
-        streams_full = simulate_multitf_indicators(
-            df_1m,
-            tfs,
-            _progress,
-            macd_impl=macd_impl,
-            adx_impl=adx_impl,
-            cache_dir=str(cache_dir),
-            symbol=symbol,
-            start_utc=warmup_start,
-            end_utc=end,
-            required_fields=req_spec,
-        )
-        prepared = build_prepared_dataset(
-            symbol=symbol,
-            start=warmup_start,
-            end=end,
-            timeframes=tfs,
-            price_source=price_source,
-            macd_impl=macd_impl,
-            adx_impl=adx_impl,
-            required_fields=req_spec,
-            market_state_thresholds=None,
-            df_1m_full=df_1m,
-            streams_full=streams_full,
-        )
-        save_prepared_dataset_to_disk(str(cache_dir), prepared)
 
     return {
-        "df_1m": slice_df_1m_window(prepared.df_1m_full, warmup_start, end),
-        "streams_full": slice_streams_window(prepared.streams_full, warmup_start, end, timeframes=tfs),
+        "df_1m": bundle.df_1m,
+        "streams_full": bundle.streams_full,
         "cache_dir": str(cache_dir),
     }
 

@@ -19,17 +19,10 @@ if str(REPO_ROOT) not in sys.path:
 from app.backtest import run_backtest_tick
 from app.backtest_models import BacktestConfig
 from app.constants import BACKTEST_MODE_BAR_1M_HTF_CLOSED_ONLY, BACKTEST_MODE_TICK
-from app.data_binance import binance_fapi_server_time_utc, fetch_klines_1m_futures
+from app.data_binance import binance_fapi_server_time_utc
 from app.fast_backtest import run_backtest_auto
-from app.indicators_streaming import simulate_multitf_indicators
-from app.prepared_dataset import (
-    build_prepared_dataset,
-    find_covering_prepared_dataset_on_disk,
-    save_prepared_dataset_to_disk,
-    slice_df_1m_window,
-    slice_streams_window,
-)
-from app.research.replay import replay_backtest_result
+from app.research.replay import extract_backtest_replay_context, replay_backtest_result
+from app.stream_bundle_loader import load_stream_bundle_library_first
 from app.strategy_compiler import FAST_BAR_ENGINE
 from app.strategy_requirements import compile_stream_requirements
 from app.utils_time import parse_utc, required_warmup_minutes
@@ -43,6 +36,11 @@ from tools.run_saved_preset import (
     _safe_round,
     _slug,
     _write_verification_bundle,
+)
+from tools.replay_bundle_cache import (
+    build_replay_bundle_spec,
+    load_replay_bundle,
+    save_replay_bundle,
 )
 from tools.sweep_saved_preset_pullback_variants import (
     _append_entry_rules,
@@ -140,7 +138,13 @@ def _sort_key(row: Dict[str, Any], objective: str) -> Tuple[Any, ...]:
     return (primary, profit_factor, -drawdown, trades)
 
 
-def _replay_exit_combo(base_result: Any, base_cfg: BacktestConfig, *, stop_value: float, take_value: float) -> Any:
+def _replay_exit_combo(
+    base_result: Any,
+    base_cfg: BacktestConfig,
+    *,
+    stop_value: float,
+    take_value: float,
+) -> Any:
     next_cfg = _apply_exit_values(base_cfg, stop_value=stop_value, take_value=take_value)
     return replay_backtest_result(
         base_result,
@@ -268,7 +272,7 @@ def _run_replay_grid(
         if show_chunk_progress:
             print(f"Replay chunk size: {resolved_chunk_size}", flush=True)
             print("Running combo replay in parallel...", flush=True)
-        replay_context = getattr(base_result, "replay_context", None)
+        replay_context = extract_backtest_replay_context(base_result)
         if not replay_context:
             raise ValueError("Base backtest result is missing replay_context, so parallel replay is unavailable.")
         temp_dir_ctx = tempfile.TemporaryDirectory(prefix="variant_exit_replay_ctx_")
@@ -413,7 +417,7 @@ def main() -> int:
     parser.add_argument("--take-values", default="3,4,5,6,7,8,10")
     parser.add_argument("--objective", default="ending_balance", choices=["ending_balance", "return_pct", "profit_factor"])
     parser.add_argument("--top-n", type=int, default=10)
-    parser.add_argument("--workers", type=int, default=1, help="Parallel combo workers. Use 0 for auto.")
+    parser.add_argument("--workers", type=int, default=0, help="Parallel combo workers. Auto by default; use 1 to force single-worker.")
     parser.add_argument("--chunk-size", type=int, default=0, help="Optional combo chunk size per worker task.")
     parser.add_argument(
         "--benchmark-workers",
@@ -427,6 +431,7 @@ def main() -> int:
         help="Comma-separated replay worker counts to benchmark when --benchmark-workers is enabled.",
     )
     parser.add_argument("--output-dir", default=None)
+    parser.add_argument("--show-server-time", action="store_true", default=False)
     args = parser.parse_args()
 
     if args.variant not in variants:
@@ -489,8 +494,10 @@ def main() -> int:
 
     preset_warmup = int(settings.get("warmup_min", 0) or 0)
     needed_warmup = required_warmup_minutes(tfs, required_fields=req_spec)
-    warmup = max(preset_warmup, int(needed_warmup or 0))
-    warmup_start = start - pd.Timedelta(minutes=warmup)
+    query_warmup = max(0, int(preset_warmup))
+    compute_warmup = max(query_warmup, int(needed_warmup or 0))
+    warmup_start = start - pd.Timedelta(minutes=query_warmup)
+    compute_start = start - pd.Timedelta(minutes=compute_warmup)
 
     cache_dir = _resolve_cache_dir(repo_root, args.cache_dir or str(settings.get("cache_dir", "data_cache") or "data_cache"))
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -510,107 +517,135 @@ def main() -> int:
     print(f"Window UTC: {start} -> {end}", flush=True)
     print(f"Exit grid: {len(stop_values)} x {len(take_values)} = {len(combos)} combinations", flush=True)
     print(f"Cache dir: {cache_dir}", flush=True)
+    print(
+        f"Warmup minutes: preset={preset_warmup}, indicator_required={needed_warmup}, "
+        f"query_used={query_warmup}, compute_used={compute_warmup}",
+        flush=True,
+    )
 
-    srv = binance_fapi_server_time_utc()
-    if srv is not None:
-        print(f"Binance server time (UTC): {srv}", flush=True)
+    if bool(args.show_server_time):
+        srv = binance_fapi_server_time_utc()
+        if srv is not None:
+            print(f"Binance server time (UTC): {srv}", flush=True)
 
-    prepared_disk = find_covering_prepared_dataset_on_disk(
-        str(cache_dir),
+    replay_bundle_spec = build_replay_bundle_spec(
         symbol=symbol,
-        start=warmup_start,
+        start=start,
         end=end,
+        warmup_start=warmup_start,
         timeframes=tfs,
+        bt_mode=bt_mode,
         price_source=price_source,
         macd_impl=macd_impl,
         adx_impl=adx_impl,
         required_fields=req_spec,
-        market_state_thresholds=None,
+        rules_model=rules_model,
+        tab_group_join_mode=tab_group_join_mode,
+        group_rule_join_mode=group_rule_join_mode,
+        entry_filters=entry_filters,
+        base_cfg=base_cfg,
     )
-    if prepared_disk is not None:
-        _progress("Loaded prepared dataset from disk.", 100)
-        df_1m = slice_df_1m_window(prepared_disk.df_1m_full, warmup_start, end)
-        streams_full = slice_streams_window(prepared_disk.streams_full, warmup_start, end, timeframes=tfs)
+    replay_bundle_payload = load_replay_bundle(
+        cache_dir,
+        symbol=symbol,
+        spec=replay_bundle_spec,
+    )
+    replay_source: Any = None
+    cached_event_activity = None
+    cached_signal_rows = None
+    df_1m = None
+    streams_full = None
+
+    if replay_bundle_payload is not None:
+        print(f"Loaded replay bundle: {replay_bundle_payload['spec_key'][:12]}", flush=True)
+        replay_source = {"replay_context": replay_bundle_payload["replay_context"]}
+        cached_event_activity = replay_bundle_payload.get("event_activity")
+        cached_signal_rows = replay_bundle_payload.get("signal_rows")
+        base_result = replay_bundle_payload.get("base_result_lite")
+        if base_result is not None:
+            print("Loaded cached base result.", flush=True)
+        else:
+            base_result = _replay_exit_combo(
+                replay_source,
+                base_cfg,
+                stop_value=0.0,
+                take_value=0.0,
+            )
+            upgraded_replay_bundle = save_replay_bundle(
+                cache_dir,
+                symbol=symbol,
+                spec=replay_bundle_spec,
+                result=base_result,
+            )
+            if upgraded_replay_bundle is not None:
+                print(f"Upgraded replay bundle with cached base result: {upgraded_replay_bundle.name}", flush=True)
     else:
-        df_1m = fetch_klines_1m_futures(symbol, warmup_start, end, str(cache_dir), progress_cb=_progress, price_source=price_source)
-        if df_1m.empty:
-            raise ValueError("No candles returned for the requested window.")
-        streams_full = simulate_multitf_indicators(
-            df_1m,
-            tfs,
-            _progress,
+        bundle = load_stream_bundle_library_first(
+            symbol=symbol,
+            start=warmup_start,
+            end=end,
+            compute_start=compute_start,
+            timeframes=tfs,
+            cache_dir=cache_dir,
+            price_source=price_source,
             macd_impl=macd_impl,
             adx_impl=adx_impl,
-            cache_dir=str(cache_dir),
-            symbol=symbol,
-            start_utc=warmup_start,
-            end_utc=end,
-            price_source=price_source,
             required_fields=req_spec,
-        )
-        try:
-            prepared_entry = build_prepared_dataset(
-                symbol=symbol,
-                start=warmup_start,
-                end=end,
-                timeframes=tfs,
-                price_source=price_source,
-                macd_impl=macd_impl,
-                adx_impl=adx_impl,
-                required_fields=req_spec,
-                market_state_thresholds=None,
-                df_1m_full=df_1m,
-                streams_full=streams_full,
-            )
-            saved_prepared = save_prepared_dataset_to_disk(str(cache_dir), prepared_entry)
-            if saved_prepared:
-                _progress(f"Saved prepared dataset ({Path(saved_prepared).name}).", 100)
-        except Exception:
-            pass
-
-    df_1m = _ensure_price_column(df_1m)
-    if "1m" in streams_full:
-        streams_full["1m"] = _ensure_price_column(streams_full["1m"])
-
-    print("Running base backtest for the selected rule variant...", flush=True)
-    if bt_mode == BACKTEST_MODE_TICK:
-        base_result = run_backtest_tick(
-            symbol=symbol,
-            df_1m_full=df_1m,
-            start=start,
-            end=end,
-            tfs=tfs,
-            rules_model=rules_model,
-            tab_group_join_mode=tab_group_join_mode,
-            group_rule_join_mode=group_rule_join_mode,
-            entry_filters=entry_filters,
-            cfg=base_cfg,
-            cache_dir=str(cache_dir),
             progress_cb=_progress,
-            streams_full=streams_full,
-            macd_impl=macd_impl,
         )
-    else:
-        if bt_mode == BACKTEST_MODE_BAR_1M_HTF_CLOSED_ONLY:
-            _progress("Planning backtest engine and preparing rule-specific streams...", 0)
-        base_result = run_backtest_auto(
+        df_1m = _ensure_price_column(bundle.df_1m)
+        streams_full = bundle.streams_full
+        if "1m" in streams_full:
+            streams_full["1m"] = _ensure_price_column(streams_full["1m"])
+
+        print("Running base backtest for the selected rule variant...", flush=True)
+        if bt_mode == BACKTEST_MODE_TICK:
+            base_result = run_backtest_tick(
+                symbol=symbol,
+                df_1m_full=df_1m,
+                start=start,
+                end=end,
+                tfs=tfs,
+                rules_model=rules_model,
+                tab_group_join_mode=tab_group_join_mode,
+                group_rule_join_mode=group_rule_join_mode,
+                entry_filters=entry_filters,
+                cfg=base_cfg,
+                cache_dir=str(cache_dir),
+                progress_cb=_progress,
+                streams_full=streams_full,
+                macd_impl=macd_impl,
+            )
+        else:
+            if bt_mode == BACKTEST_MODE_BAR_1M_HTF_CLOSED_ONLY:
+                _progress("Planning backtest engine and preparing rule-specific streams...", 0)
+            base_result = run_backtest_auto(
+                symbol=symbol,
+                streams_full=streams_full,
+                start=start,
+                end=end,
+                rules_model=rules_model,
+                tab_group_join_mode=tab_group_join_mode,
+                group_rule_join_mode=group_rule_join_mode,
+                cfg=base_cfg,
+                df_1m_full=df_1m,
+                entry_filters=entry_filters,
+                apply_htf_closed_only=(bt_mode == BACKTEST_MODE_BAR_1M_HTF_CLOSED_ONLY),
+            )
+        saved_replay_bundle = save_replay_bundle(
+            cache_dir,
             symbol=symbol,
-            streams_full=streams_full,
-            start=start,
-            end=end,
-            rules_model=rules_model,
-            tab_group_join_mode=tab_group_join_mode,
-            group_rule_join_mode=group_rule_join_mode,
-            cfg=base_cfg,
-            df_1m_full=df_1m,
-            entry_filters=entry_filters,
-            apply_htf_closed_only=(bt_mode == BACKTEST_MODE_BAR_1M_HTF_CLOSED_ONLY),
+            spec=replay_bundle_spec,
+            result=base_result,
         )
+        if saved_replay_bundle is not None:
+            print(f"Saved replay bundle: {saved_replay_bundle.name}", flush=True)
+        replay_source = base_result
 
     rows: List[Dict[str, Any]] = [_result_row(base_result, stop_value=0.0, take_value=0.0)]
     combos_to_replay = [(sl, tp) for sl, tp in combos if not (sl == 0.0 and tp == 0.0)]
 
-    cpu_info = detect_cpu_counts()
+    cpu_info = detect_cpu_counts(fast=True)
     logical_cpus = int(cpu_info.get("logical") or 1)
     physical_cpus = cpu_info.get("physical")
     print(
@@ -637,7 +672,7 @@ def main() -> int:
             manual_worker=int(args.workers),
         )
         replay_rows, replay_meta, benchmark_payload = _benchmark_replay_workers(
-            base_result=base_result,
+            base_result=replay_source,
             base_cfg=base_cfg,
             combos_to_replay=combos_to_replay,
             worker_candidates=worker_candidates,
@@ -660,7 +695,7 @@ def main() -> int:
             workers = 1
         print(f"Replay workers: {workers} ({worker_mode})", flush=True)
         replay_rows, replay_meta = _run_replay_grid(
-            base_result=base_result,
+            base_result=replay_source,
             base_cfg=base_cfg,
             combos_to_replay=combos_to_replay,
             workers=workers,
@@ -682,14 +717,50 @@ def main() -> int:
     best_row = rows_sorted[0]
     best_combo = (float(best_row["stop_loss_pct"]), float(best_row["take_profit_pct"]))
     best_result = base_result if best_combo == (0.0, 0.0) else _replay_exit_combo(
-        base_result,
+        replay_source,
         base_cfg,
         stop_value=best_combo[0],
         take_value=best_combo[1],
     )
 
-    event_activity = _event_activity_summary(rules_model, streams_full, start, end)
-    signal_rows = _event_signal_rows(rules_model, streams_full, start, end)
+    if isinstance(cached_event_activity, dict) and isinstance(cached_signal_rows, list):
+        print("Loaded cached verification payload.", flush=True)
+        event_activity = dict(cached_event_activity)
+        signal_rows = [dict(row) for row in list(cached_signal_rows) if isinstance(row, dict)]
+    else:
+        if streams_full is None:
+            _progress("Loading stream bundle for verification artifacts...", 0)
+            verify_bundle = load_stream_bundle_library_first(
+                symbol=symbol,
+                start=warmup_start,
+                end=end,
+                compute_start=compute_start,
+                timeframes=tfs,
+                cache_dir=cache_dir,
+                price_source=price_source,
+                macd_impl=macd_impl,
+                adx_impl=adx_impl,
+                required_fields=req_spec,
+                progress_cb=_progress,
+            )
+            df_1m = _ensure_price_column(verify_bundle.df_1m)
+            streams_full = verify_bundle.streams_full
+            if "1m" in streams_full:
+                streams_full["1m"] = _ensure_price_column(streams_full["1m"])
+
+        event_activity = _event_activity_summary(rules_model, streams_full, start, end)
+        signal_rows = _event_signal_rows(rules_model, streams_full, start, end)
+        refreshed_replay_bundle = save_replay_bundle(
+            cache_dir,
+            symbol=symbol,
+            spec=replay_bundle_spec,
+            result=replay_source,
+            base_result_lite=base_result,
+            event_activity=event_activity,
+            signal_rows=signal_rows,
+        )
+        if refreshed_replay_bundle is not None:
+            print(f"Cached verification payload in replay bundle: {refreshed_replay_bundle.name}", flush=True)
     best_cfg = _apply_exit_values(base_cfg, stop_value=best_combo[0], take_value=best_combo[1])
     bundle_dir = _write_verification_bundle(
         repo_root=repo_root,

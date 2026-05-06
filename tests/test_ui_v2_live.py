@@ -58,17 +58,13 @@ class UiV2LiveTests(unittest.TestCase):
 
         self.assertEqual(config.preset_name, "Demo")
         self.assertEqual(config.symbol, "ETHUSDT")
-        self.assertEqual(config.timeframes, ("1m", "5m", "15m", "30m", "1h"))
+        self.assertEqual(config.timeframes, ("1m", "5m"))
         self.assertFalse(config.live_use_forming)
         self.assertEqual(config.ema_1_length, 34)
         self.assertEqual(config.ema_2_length, 55)
         self.assertEqual(config.rsi_length, 14)
         self.assertEqual(config.rsi_smoothing, 3)
-        self.assertIn(("1m", 9, 21), config.ema_by_timeframe)
-        self.assertIn(("5m", 21, 50), config.ema_by_timeframe)
-        self.assertIn(("15m", 34, 55), config.ema_by_timeframe)
-        self.assertIn(("30m", 34, 55), config.ema_by_timeframe)
-        self.assertIn(("1h", 34, 55), config.ema_by_timeframe)
+        self.assertEqual(config.ema_by_timeframe, (("1m", 9, 21), ("5m", 21, 50)))
 
     def test_build_config_from_inline_preset_uses_given_name_and_enabled_timeframes(self) -> None:
         service = LiveRuntimeService(presets_path=self._write_presets({"meta": {}, "presets": {}}))
@@ -89,14 +85,14 @@ class UiV2LiveTests(unittest.TestCase):
 
         self.assertEqual(config.preset_name, "builder_preview")
         self.assertEqual(config.symbol, "BTCUSDT")
-        self.assertEqual(config.timeframes, ("1m", "5m", "15m", "30m", "1h"))
+        self.assertEqual(config.timeframes, ("1m", "15m"))
         self.assertEqual(
             config.ema_by_timeframe,
-            (("1m", 9, 21), ("5m", 9, 21), ("15m", 50, 200), ("30m", 9, 21), ("1h", 9, 21)),
+            (("1m", 9, 21), ("15m", 50, 200)),
         )
         self.assertEqual(
             config.rsi_by_timeframe,
-            (("1m", 14, 3), ("5m", 14, 3), ("15m", 14, 3), ("30m", 14, 3), ("1h", 14, 3)),
+            (("1m", 14, 3), ("15m", 14, 3)),
         )
 
     def test_build_config_from_live_settings_is_not_preset_bound(self) -> None:
@@ -149,7 +145,7 @@ class UiV2LiveTests(unittest.TestCase):
         self.assertEqual(config.rsi_smoothing, 5)
         self.assertIn(("1m", 21, 5), config.rsi_by_timeframe)
         self.assertIn(("5m", 34, 8), config.rsi_by_timeframe)
-        self.assertIn(("15m", 21, 5), config.rsi_by_timeframe)
+        self.assertEqual(config.rsi_by_timeframe, (("1m", 21, 5), ("5m", 34, 8)))
 
     def test_build_payload_includes_taker_bias_prev_closed_and_windows(self) -> None:
         service = LiveRuntimeService(presets_path=self._write_presets({"meta": {}, "presets": {}}))

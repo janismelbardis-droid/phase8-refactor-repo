@@ -19,17 +19,10 @@ if str(REPO_ROOT) not in sys.path:
 from app.backtest import run_backtest_tick
 from app.backtest_models import BacktestConfig
 from app.constants import BACKTEST_MODE_BAR_1M_HTF_CLOSED_ONLY, BACKTEST_MODE_TICK
-from app.data_binance import binance_fapi_server_time_utc, fetch_klines_1m_futures
+from app.data_binance import binance_fapi_server_time_utc
 from app.fast_backtest import run_backtest_auto
-from app.indicators_streaming import simulate_multitf_indicators
-from app.prepared_dataset import (
-    build_prepared_dataset,
-    find_covering_prepared_dataset_on_disk,
-    save_prepared_dataset_to_disk,
-    slice_df_1m_window,
-    slice_streams_window,
-)
 from app.research.replay import build_backtest_replay_plan, replay_backtest_result
+from app.stream_bundle_loader import load_stream_bundle_library_first
 from app.strategy_requirements import compile_stream_requirements
 from app.utils_time import parse_utc, required_warmup_minutes
 from tools.run_saved_preset import (
@@ -128,8 +121,10 @@ def _run_window_exit_sweep(task: Dict[str, Any]) -> Dict[str, Any]:
     start = pd.to_datetime(task["start"], utc=True)
     end = pd.to_datetime(task["end"], utc=True)
     warmup = int(task["warmup"])
+    compute_warmup = int(task.get("compute_warmup", warmup))
     tfs = list(task["tfs"])
     warmup_start = start - pd.Timedelta(minutes=warmup)
+    compute_start = start - pd.Timedelta(minutes=compute_warmup)
     cache_dir = Path(task["cache_dir"]).resolve()
     bt_mode = str(task["bt_mode"])
     price_source = str(task["price_source"])
@@ -145,55 +140,21 @@ def _run_window_exit_sweep(task: Dict[str, Any]) -> Dict[str, Any]:
     take_values = [float(v) for v in task["take_values"]]
     combos = [(sl, tp) for sl in stop_values for tp in take_values]
 
-    prepared_disk = find_covering_prepared_dataset_on_disk(
-        str(cache_dir),
+    bundle = load_stream_bundle_library_first(
         symbol=symbol,
         start=warmup_start,
         end=end,
+        compute_start=compute_start,
         timeframes=tfs,
+        cache_dir=cache_dir,
         price_source=price_source,
         macd_impl=macd_impl,
         adx_impl=adx_impl,
         required_fields=req_spec,
-        market_state_thresholds=None,
+        progress_cb=None,
     )
-    if prepared_disk is not None:
-        df_1m = slice_df_1m_window(prepared_disk.df_1m_full, warmup_start, end)
-        streams_full = slice_streams_window(prepared_disk.streams_full, warmup_start, end, timeframes=tfs)
-    else:
-        df_1m = fetch_klines_1m_futures(symbol, warmup_start, end, str(cache_dir), progress_cb=None, price_source=price_source)
-        if df_1m.empty:
-            raise ValueError(f"No candles returned for window {start} -> {end}.")
-        streams_full = simulate_multitf_indicators(
-            df_1m,
-            tfs,
-            None,
-            macd_impl=macd_impl,
-            adx_impl=adx_impl,
-            cache_dir=str(cache_dir),
-            symbol=symbol,
-            start_utc=warmup_start,
-            end_utc=end,
-            price_source=price_source,
-            required_fields=req_spec,
-        )
-        try:
-            prepared_entry = build_prepared_dataset(
-                symbol=symbol,
-                start=warmup_start,
-                end=end,
-                timeframes=tfs,
-                price_source=price_source,
-                macd_impl=macd_impl,
-                adx_impl=adx_impl,
-                required_fields=req_spec,
-                market_state_thresholds=None,
-                df_1m_full=df_1m,
-                streams_full=streams_full,
-            )
-            save_prepared_dataset_to_disk(str(cache_dir), prepared_entry)
-        except Exception:
-            pass
+    df_1m = bundle.df_1m
+    streams_full = bundle.streams_full
 
     if bt_mode == BACKTEST_MODE_TICK:
         base_result = run_backtest_tick(
@@ -335,7 +296,7 @@ def main() -> int:
     parser.add_argument("--equity-curve-stride", type=int, default=15)
     parser.add_argument("--stop-values", default="0,1.5,2,2.5,3,4")
     parser.add_argument("--take-values", default="0,4,5,6,8")
-    parser.add_argument("--workers", type=int, default=1, help="Parallel window workers. Use 0 for auto.")
+    parser.add_argument("--workers", type=int, default=0, help="Parallel window workers. Auto by default; use 1 to force single-worker.")
     parser.add_argument("--top-n", type=int, default=12)
     parser.add_argument("--output-dir", default=None)
     args = parser.parse_args()
@@ -390,7 +351,8 @@ def main() -> int:
 
     preset_warmup = int(settings.get("warmup_min", 0) or 0)
     needed_warmup = required_warmup_minutes(tfs, required_fields=req_spec)
-    warmup = max(preset_warmup, int(needed_warmup or 0))
+    warmup = max(0, preset_warmup)
+    compute_warmup = max(warmup, int(needed_warmup or 0))
 
     cache_dir = _resolve_cache_dir(repo_root, args.cache_dir or str(settings.get("cache_dir", "data_cache") or "data_cache"))
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -428,6 +390,7 @@ def main() -> int:
             "start": start,
             "end": end,
             "warmup": warmup,
+            "compute_warmup": compute_warmup,
             "tfs": list(tfs),
             "cache_dir": str(cache_dir),
             "bt_mode": bt_mode,

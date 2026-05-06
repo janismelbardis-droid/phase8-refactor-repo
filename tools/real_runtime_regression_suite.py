@@ -154,6 +154,31 @@ def _trade_parity_case(*, python_exe: str, output_dir: Path) -> Dict[str, Any]:
     }
 
 
+def _replay_context_safety_case(*, python_exe: str, output_dir: Path) -> Dict[str, Any]:
+    case_dir = output_dir / "replay_context_safety_suite"
+    command = [
+        python_exe,
+        str(REPO_ROOT / "tools" / "real_replay_context_safety_suite.py"),
+        "--output-dir",
+        str(case_dir),
+    ]
+    run = _run_command(label="replay_context_safety_suite", command=command, workdir=REPO_ROOT)
+    summary_path = case_dir / "summary.json"
+    summary = _load_json(summary_path) if run["returncode"] == 0 and summary_path.exists() else {}
+    checks = [
+        _make_check("replay_context_safety_returncode_zero", run["returncode"] == 0, f"returncode={run['returncode']}"),
+        _make_check("replay_context_safety_summary_exists", summary_path.exists(), str(summary_path)),
+        _make_check("replay_context_safety_all_passed", bool(summary.get("all_passed")), f"all_passed={summary.get('all_passed')}"),
+    ]
+    return {
+        "label": "replay_context_safety_suite",
+        "run": run,
+        "summary_path": str(summary_path),
+        "summary": summary,
+        "checks": checks,
+    }
+
+
 def _batch_case(*, python_exe: str, output_dir: Path) -> Dict[str, Any]:
     case_dir = output_dir / "batch_repeat5"
     command = [
@@ -332,7 +357,7 @@ def _write_report(path: Path, payload: Dict[str, Any]) -> None:
         case_name = str(case.get("label") or "")
         key_result = "-"
         summary = case.get("summary", {}) or {}
-        if case_name in {"parity_suite", "trade_parity_suite"}:
+        if case_name in {"parity_suite", "trade_parity_suite", "replay_context_safety_suite"}:
             key_result = f"all_passed={summary.get('all_passed')}"
         elif case_name == "batch_repeat5":
             key_result = (
@@ -391,6 +416,7 @@ def main() -> int:
     cases = [
         _parity_case(python_exe=str(args.python_exe), output_dir=output_dir),
         _trade_parity_case(python_exe=str(args.python_exe), output_dir=output_dir),
+        _replay_context_safety_case(python_exe=str(args.python_exe), output_dir=output_dir),
         _batch_case(python_exe=str(args.python_exe), output_dir=output_dir),
         _entry_filter_case(python_exe=str(args.python_exe), output_dir=output_dir),
         _pullback_variant_case(python_exe=str(args.python_exe), output_dir=output_dir),

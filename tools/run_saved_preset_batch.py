@@ -16,6 +16,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from app.backtest_models import BacktestConfig
+from app.backtest_reporting import build_backtest_replay_strategy_signature
 from app.stream_bundle_loader import clear_stream_bundle_memory_cache
 from app.strategy_requirements import compile_stream_requirements
 from app.utils_time import parse_utc, required_warmup_minutes
@@ -130,12 +131,22 @@ def _bundle_affinity_key(job: Dict[str, Any]) -> str:
 
 
 def _replay_affinity_key(job: Dict[str, Any], cfg: BacktestConfig) -> str:
+    strategy_signature = build_backtest_replay_strategy_signature(
+        symbol=job.get("symbol"),
+        start=job.get("start"),
+        end=job.get("end"),
+        rules_model=dict(job.get("rules_model") or {}),
+        tab_group_join_mode=dict(job.get("tab_group_join_mode") or {}),
+        group_rule_join_mode=dict(job.get("group_rule_join_mode") or {}),
+        entry_filters=dict(job.get("entry_filters") or {}),
+    )
     payload = {
         "preset_name": str(job.get("preset_name") or ""),
         "symbol": str(job.get("symbol") or ""),
         "start": str(job.get("start") or ""),
         "end": str(job.get("end") or ""),
         "bundle_affinity_key": str(job.get("bundle_affinity_key") or ""),
+        "strategy_signature": str(strategy_signature),
         "step_timeframe": str(getattr(cfg, "step_timeframe", "") or ""),
         "allow_reverse": bool(getattr(cfg, "allow_reverse", False)),
         "skip_if_both_entries": bool(getattr(cfg, "skip_if_both_entries", False)),

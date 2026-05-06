@@ -82,6 +82,56 @@ def _make_trade_df(trades: List[Trade]) -> pd.DataFrame:
     return df
 
 
+def _replay_signature_value(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, pd.Timestamp):
+        return pd.to_datetime(value, utc=True, errors="coerce").isoformat()
+    if isinstance(value, Mapping):
+        return {
+            str(key): _replay_signature_value(item)
+            for key, item in sorted(value.items(), key=lambda kv: str(kv[0]))
+        }
+    if isinstance(value, (list, tuple)):
+        return [_replay_signature_value(item) for item in value]
+    if isinstance(value, (set, frozenset)):
+        return sorted(
+            (_replay_signature_value(item) for item in value),
+            key=lambda item: json.dumps(item, sort_keys=True, ensure_ascii=False, default=str),
+        )
+    try:
+        return _replay_signature_value(value.to_dict())
+    except Exception:
+        return str(value)
+
+
+def build_backtest_replay_strategy_signature(
+    *,
+    symbol: Any,
+    start: Any,
+    end: Any,
+    rules_model: Mapping[str, Any],
+    tab_group_join_mode: Mapping[str, Any],
+    group_rule_join_mode: Mapping[str, Any],
+    entry_filters: Any,
+) -> str:
+    payload = {
+        "symbol": str(symbol or ""),
+        "start": pd.to_datetime(start, utc=True, errors="coerce"),
+        "end": pd.to_datetime(end, utc=True, errors="coerce"),
+        "rules_model": rules_model,
+        "tab_group_join_mode": tab_group_join_mode,
+        "group_rule_join_mode": group_rule_join_mode,
+        "entry_filters": entry_filters,
+    }
+    return json.dumps(
+        _replay_signature_value(payload),
+        sort_keys=True,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        default=str,
+    )
+
 
 def _apply_trade_reporting_metrics(summary: Dict[str, Any], trades: List[Trade]) -> Dict[str, Any]:
     out = dict(summary or {})
@@ -198,7 +248,20 @@ def _normalize_backtest_replay_context(
         "df_1m_full": replay_context.get("df_1m_full"),
         "entry_filters": copy.deepcopy(replay_context.get("entry_filters")),
     }
+    normalized["__strategy_signature"] = str(
+        replay_context.get("__strategy_signature")
+        or build_backtest_replay_strategy_signature(
+            symbol=normalized["symbol"],
+            start=normalized["start"],
+            end=normalized["end"],
+            rules_model=normalized["rules_model"],
+            tab_group_join_mode=normalized["tab_group_join_mode"],
+            group_rule_join_mode=normalized["group_rule_join_mode"],
+            entry_filters=normalized["entry_filters"],
+        )
+    )
     for key in (
+        "__strategy_signature",
         "__compiled_tab_signals_cache",
         "__compiled_group_signals_cache",
         "__compiled_cache_range_start",

@@ -21,7 +21,7 @@ from .backtest_execution import (
 from .backtest_frames import _prev_source_row_index_for_df, make_streams_htf_closed_only
 from .backtest_models import BacktestConfig, BacktestResult, Trade
 from .backtest_planning import _compile_tab_signal_arrays
-from .backtest_reporting import _apply_trade_reporting_metrics
+from .backtest_reporting import _apply_trade_reporting_metrics, build_backtest_replay_strategy_signature
 from .strategy_compiler import FAST_BAR_ENGINE, compile_strategy_plan
 from .utils_time import interval_to_ms
 
@@ -68,6 +68,31 @@ class CompiledReplayPlan:
     strategy_plan_blockers: List[str]
     timing_prepare_streams_sec: float
     timing_compile_signals_sec: float
+
+
+def _strategy_signature_matches_replay_context(
+    replay_context: Optional[Mapping[str, Any]],
+    *,
+    symbol: str,
+    start: Any,
+    end: Any,
+    rules_model: Mapping[str, Any],
+    tab_group_join_mode: Mapping[str, Any],
+    group_rule_join_mode: Mapping[str, Any],
+    entry_filters: Any,
+) -> bool:
+    if not isinstance(replay_context, Mapping):
+        return False
+    current_signature = build_backtest_replay_strategy_signature(
+        symbol=symbol,
+        start=start,
+        end=end,
+        rules_model=rules_model,
+        tab_group_join_mode=tab_group_join_mode,
+        group_rule_join_mode=group_rule_join_mode,
+        entry_filters=entry_filters,
+    )
+    return str(replay_context.get("__strategy_signature") or "") == str(current_signature)
 
 
 @dataclass
@@ -304,6 +329,15 @@ def _compiled_replay_context(
     group_rule_join_mode: Mapping[str, Sequence[str]],
     entry_filters: Optional[Mapping[str, Any]],
 ) -> Dict[str, Any]:
+    strategy_signature = build_backtest_replay_strategy_signature(
+        symbol=plan.symbol,
+        start=plan.start,
+        end=plan.end,
+        rules_model=rules_model,
+        tab_group_join_mode=tab_group_join_mode,
+        group_rule_join_mode=group_rule_join_mode,
+        entry_filters=entry_filters,
+    )
     return {
         "symbol": str(plan.symbol or ""),
         "start": pd.to_datetime(plan.start, utc=True),
@@ -312,6 +346,7 @@ def _compiled_replay_context(
         "tab_group_join_mode": dict(tab_group_join_mode or {}),
         "group_rule_join_mode": {k: list(v) for k, v in dict(group_rule_join_mode or {}).items()},
         "entry_filters": dict(entry_filters or {}),
+        "__strategy_signature": str(strategy_signature),
         "__replay_engine": FAST_BAR_ENGINE,
         "__compiled_bar_plan": plan,
     }
@@ -1038,6 +1073,17 @@ def run_backtest_compiled_replay_event_driven(
     summary["compiled_replay_mode"] = "event_driven"
 
     next_replay_context = replay_context
+    if not _strategy_signature_matches_replay_context(
+        next_replay_context,
+        symbol=plan.symbol,
+        start=plan.start,
+        end=plan.end,
+        rules_model=rules_model,
+        tab_group_join_mode=tab_group_join_mode,
+        group_rule_join_mode=group_rule_join_mode,
+        entry_filters=entry_filters,
+    ):
+        next_replay_context = None
     if next_replay_context is None:
         next_replay_context = _compiled_replay_context(
             plan=plan,
@@ -1416,6 +1462,17 @@ def run_backtest_compiled_plan(
         summary["compiled_plan_compile_signals_sec"] = float(plan.timing_compile_signals_sec)
 
     next_replay_context = replay_context
+    if not _strategy_signature_matches_replay_context(
+        next_replay_context,
+        symbol=plan.symbol,
+        start=plan.start,
+        end=plan.end,
+        rules_model=rules_model,
+        tab_group_join_mode=tab_group_join_mode,
+        group_rule_join_mode=group_rule_join_mode,
+        entry_filters=entry_filters,
+    ):
+        next_replay_context = None
     if next_replay_context is None:
         next_replay_context = _compiled_replay_context(
             plan=plan,

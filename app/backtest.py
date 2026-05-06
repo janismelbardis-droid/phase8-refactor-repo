@@ -65,6 +65,7 @@ from .backtest_reporting import (
     _apply_trade_reporting_metrics,
     _normalize_backtest_replay_context,
     build_backtest_replay_context,
+    build_backtest_replay_strategy_signature,
 )
 from .backtest_planning import (
     _barsago_profile_for_tab,
@@ -99,6 +100,31 @@ from .backtest_frames import (
 
 
 _DEFAULT_EVAL_TAB_GENERIC = eval_tab_generic
+
+
+def _strategy_signature_matches_replay_context(
+    replay_context: Optional[Mapping[str, Any]],
+    *,
+    symbol: str,
+    start: Any,
+    end: Any,
+    rules_model: Mapping[str, Any],
+    tab_group_join_mode: Mapping[str, Any],
+    group_rule_join_mode: Mapping[str, Any],
+    entry_filters: Any,
+) -> bool:
+    if not isinstance(replay_context, Mapping):
+        return False
+    current_signature = build_backtest_replay_strategy_signature(
+        symbol=symbol,
+        start=start,
+        end=end,
+        rules_model=rules_model,
+        tab_group_join_mode=tab_group_join_mode,
+        group_rule_join_mode=group_rule_join_mode,
+        entry_filters=entry_filters,
+    )
+    return str(replay_context.get("__strategy_signature") or "") == str(current_signature)
 
 def _safe_float(v: Any) -> Optional[float]:
     try:
@@ -815,10 +841,33 @@ def run_backtest(symbol: str,
     frozen_df_1m = _freeze_backtest_frame(df_1m_full, end=end)
     normalized_replay_context: Optional[Dict[str, Any]]
     if isinstance(replay_context, dict):
-        normalized_replay_context = _normalize_backtest_replay_context(
+        candidate_replay_context = _normalize_backtest_replay_context(
             replay_context,
             preserve_identity=True,
         )
+        if _strategy_signature_matches_replay_context(
+            candidate_replay_context,
+            symbol=symbol,
+            start=start,
+            end=end,
+            rules_model=rules_model,
+            tab_group_join_mode=tab_group_join_mode,
+            group_rule_join_mode=group_rule_join_mode,
+            entry_filters=entry_filters,
+        ):
+            normalized_replay_context = candidate_replay_context
+        else:
+            normalized_replay_context = build_backtest_replay_context(
+                symbol=symbol,
+                streams_full=frozen_streams,
+                start=start,
+                end=end,
+                rules_model=rules_model,
+                tab_group_join_mode=tab_group_join_mode,
+                group_rule_join_mode=group_rule_join_mode,
+                df_1m_full=frozen_df_1m,
+                entry_filters=entry_filters,
+            )
     else:
         normalized_replay_context = build_backtest_replay_context(
             symbol=symbol,

@@ -36,10 +36,12 @@ class CompiledBarPlan:
     idx: pd.DatetimeIndex
     compiled_tabs: Dict[str, np.ndarray]
     decision_mask: np.ndarray
+    price_arr: np.ndarray
     open_arr: np.ndarray
     high_arr: np.ndarray
     low_arr: np.ndarray
     close_arr: np.ndarray
+    open_time_ns_arr: np.ndarray
     strategy_plan_engine: str
     strategy_plan_notes: List[str]
     strategy_plan_blockers: List[str]
@@ -55,10 +57,12 @@ class CompiledReplayPlan:
     idx: pd.DatetimeIndex
     compiled_tabs: Dict[str, np.ndarray]
     decision_mask: np.ndarray
+    price_arr: np.ndarray
     open_arr: np.ndarray
     high_arr: np.ndarray
     low_arr: np.ndarray
     close_arr: np.ndarray
+    open_time_ns_arr: np.ndarray
     strategy_plan_engine: str
     strategy_plan_notes: List[str]
     strategy_plan_blockers: List[str]
@@ -257,6 +261,17 @@ def build_compiled_bar_plan(
     low_arr = _fill_missing_numeric(low_arr, open_arr)
     close_arr = _numeric_series(candle_frame, "close", fallback=price_arr.copy())
     close_arr = _fill_missing_numeric(close_arr, open_arr)
+    open_time_ns_arr = idx.asi8 - 60_000_000_000 + 1_000_000
+    if "open_time" in candle_frame.columns:
+        try:
+            open_time = pd.to_datetime(candle_frame["open_time"], utc=True, errors="coerce")
+            if len(open_time) == len(df1):
+                mask = (~pd.isna(open_time)).to_numpy(dtype=bool, copy=False)
+                raw_ns = open_time.astype("int64", copy=False).to_numpy(dtype=np.int64, copy=False)
+                open_time_ns_arr = open_time_ns_arr.copy()
+                open_time_ns_arr[mask] = raw_ns[mask]
+        except Exception:
+            pass
 
     return CompiledBarPlan(
         symbol=str(symbol or ""),
@@ -267,10 +282,12 @@ def build_compiled_bar_plan(
         idx=idx,
         compiled_tabs=compiled_tabs,
         decision_mask=decision_mask,
+        price_arr=price_arr,
         open_arr=open_arr,
         high_arr=high_arr,
         low_arr=low_arr,
         close_arr=close_arr,
+        open_time_ns_arr=open_time_ns_arr,
         strategy_plan_engine=str(strategy_plan.engine),
         strategy_plan_notes=list(strategy_plan.notes),
         strategy_plan_blockers=list(strategy_plan.blockers),
@@ -312,10 +329,12 @@ def _compiled_replay_plan(plan: CompiledBarPlan | CompiledReplayPlan) -> Compile
         idx=pd.DatetimeIndex(plan.idx),
         compiled_tabs={str(key): value for key, value in dict(plan.compiled_tabs or {}).items()},
         decision_mask=plan.decision_mask,
+        price_arr=plan.price_arr,
         open_arr=plan.open_arr,
         high_arr=plan.high_arr,
         low_arr=plan.low_arr,
         close_arr=plan.close_arr,
+        open_time_ns_arr=plan.open_time_ns_arr,
         strategy_plan_engine=str(plan.strategy_plan_engine or ""),
         strategy_plan_notes=list(plan.strategy_plan_notes or []),
         strategy_plan_blockers=list(plan.strategy_plan_blockers or []),
@@ -593,6 +612,8 @@ def run_backtest_compiled_replay_event_driven(
     high_arr = replay_plan.high_arr
     low_arr = replay_plan.low_arr
     close_arr = replay_plan.close_arr
+    price_arr = replay_plan.price_arr
+    open_time_ns_arr = replay_plan.open_time_ns_arr
     decision_mask = replay_plan.decision_mask
     compiled_tabs = replay_plan.compiled_tabs
     empty_signal = np.zeros(row_count, dtype=bool)
@@ -664,6 +685,12 @@ def run_backtest_compiled_replay_event_driven(
         raw_open = float(open_arr[row_index]) if np.isfinite(open_arr[row_index]) else float(close_arr[row_index])
         return float(raw_open)
 
+    def _bar_open_time_ns(row_index: int) -> int:
+        try:
+            return int(open_time_ns_arr[row_index])
+        except Exception:
+            return int(idx_ns[row_index])
+
     def _next_flat_open_signal(current_row: int) -> tuple[Optional[int], int]:
         pos = int(np.searchsorted(flat_open_indices, int(current_row), side="left"))
         if pos >= int(flat_open_indices.size):
@@ -690,7 +717,7 @@ def run_backtest_compiled_replay_event_driven(
         balance -= fee_entry
         pos_side = 1 if str(side_text).upper() == "LONG" else -1
         entry_price = float(fill_price)
-        entry_time_ns = int(idx_ns[row_index])
+        entry_time_ns = _bar_open_time_ns(row_index)
         entry_row_index = int(row_index)
         entry_reason = str(reason)
 
@@ -883,7 +910,7 @@ def run_backtest_compiled_replay_event_driven(
                 )
             extrema_end = int(price_exit.row_index) - 1 if price_exit.at_open else int(price_exit.row_index)
             _close_position(
-                int(idx_ns[int(price_exit.row_index)]),
+                (_bar_open_time_ns(int(price_exit.row_index)) if bool(price_exit.at_open) else int(idx_ns[int(price_exit.row_index)])),
                 float(price_exit.fill_price_raw),
                 str(price_exit.reason),
                 ambiguous=bool(price_exit.ambiguous),
@@ -915,7 +942,7 @@ def run_backtest_compiled_replay_event_driven(
             exec_open = _bar_open_price(rule_exec_row)
             if action_code == 2:
                 _close_position(
-                    int(idx_ns[rule_exec_row]),
+                    _bar_open_time_ns(rule_exec_row),
                     exec_open,
                     "Reverse to Short",
                     exit_row_index=rule_exec_row,
@@ -924,7 +951,7 @@ def run_backtest_compiled_replay_event_driven(
                 _open_position("SHORT", rule_exec_row, "Reverse to Short")
             elif action_code == -2:
                 _close_position(
-                    int(idx_ns[rule_exec_row]),
+                    _bar_open_time_ns(rule_exec_row),
                     exec_open,
                     "Reverse to Long",
                     exit_row_index=rule_exec_row,
@@ -933,7 +960,7 @@ def run_backtest_compiled_replay_event_driven(
                 _open_position("LONG", rule_exec_row, "Reverse to Long")
             elif action_code == 1:
                 _close_position(
-                    int(idx_ns[rule_exec_row]),
+                    _bar_open_time_ns(rule_exec_row),
                     exec_open,
                     "Long Exit",
                     exit_row_index=rule_exec_row,
@@ -941,7 +968,7 @@ def run_backtest_compiled_replay_event_driven(
                 )
             elif action_code == -1:
                 _close_position(
-                    int(idx_ns[rule_exec_row]),
+                    _bar_open_time_ns(rule_exec_row),
                     exec_open,
                     "Short Exit",
                     exit_row_index=rule_exec_row,
@@ -966,7 +993,9 @@ def run_backtest_compiled_replay_event_driven(
             equity_time_ns=equity_time_ns,
             equity_vals=equity_vals,
         )
-        final_price = float(close_arr[end_i]) if np.isfinite(close_arr[end_i]) else float(open_arr[end_i])
+        final_price = float(price_arr[end_i]) if np.isfinite(price_arr[end_i]) else float(open_arr[end_i])
+        if not np.isfinite(final_price):
+            final_price = float(close_arr[end_i])
         _close_position(
             int(idx_ns[end_i]),
             final_price,
@@ -1054,6 +1083,8 @@ def run_backtest_compiled_plan(
     high_arr = plan.high_arr
     low_arr = plan.low_arr
     close_arr = plan.close_arr
+    price_arr = plan.price_arr
+    open_time_ns_arr = plan.open_time_ns_arr
     decision_mask = plan.decision_mask
     compiled_tabs = plan.compiled_tabs
     empty_signal = np.zeros(row_count, dtype=bool)
@@ -1108,6 +1139,12 @@ def run_backtest_compiled_plan(
     scheduled_close_reason: Optional[str] = None
     scheduled_open_side: Optional[str] = None
     scheduled_open_reason: str = ""
+
+    def _bar_open_time_ns(row_index: int) -> int:
+        try:
+            return int(open_time_ns_arr[row_index])
+        except Exception:
+            return int(idx_ns[row_index])
 
     def _close_position(ts_ns: int, fill_price_raw: float, reason: str, *, ambiguous: bool = False, exit_row_index: Optional[int] = None) -> None:
         nonlocal balance, pos_side, qty, entry_price, entry_time_ns, entry_reason, fee_entry
@@ -1244,6 +1281,7 @@ def run_backtest_compiled_plan(
     t0 = time.perf_counter()
     for j in range(start_i, end_i + 1):
         ts_ns = int(idx_ns[j])
+        open_ts_ns = _bar_open_time_ns(j)
 
         bar_open = float(open_arr[j]) if np.isfinite(open_arr[j]) else float(close_arr[j])
         bar_high = float(high_arr[j]) if np.isfinite(high_arr[j]) else bar_open
@@ -1251,9 +1289,9 @@ def run_backtest_compiled_plan(
         bar_close = float(close_arr[j]) if np.isfinite(close_arr[j]) else bar_open
 
         if scheduled_close_reason and pos_side != 0:
-            _close_position(ts_ns, bar_open, scheduled_close_reason, exit_row_index=j)
+            _close_position(open_ts_ns, bar_open, scheduled_close_reason, exit_row_index=j)
         if scheduled_open_side and pos_side == 0:
-            _open_position(scheduled_open_side, ts_ns, bar_open, scheduled_open_reason, j)
+            _open_position(scheduled_open_side, open_ts_ns, bar_open, scheduled_open_reason, j)
         scheduled_close_reason = None
         scheduled_open_side = None
         scheduled_open_reason = ""
@@ -1342,7 +1380,9 @@ def run_backtest_compiled_plan(
     timing_simulation_sec = time.perf_counter() - t0
 
     if pos_side != 0 and entry_time_ns is not None:
-        final_price = float(close_arr[end_i]) if np.isfinite(close_arr[end_i]) else float(open_arr[end_i])
+        final_price = float(price_arr[end_i]) if np.isfinite(price_arr[end_i]) else float(open_arr[end_i])
+        if not np.isfinite(final_price):
+            final_price = float(close_arr[end_i])
         _close_position(int(idx_ns[end_i]), final_price, "Force Close (End)", exit_row_index=end_i)
 
     equity_curve = pd.DataFrame(

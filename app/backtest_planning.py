@@ -7,12 +7,13 @@ structural split so the core engine can stay focused on execution while the
 public import surface remains unchanged.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 import pandas as pd
 
-from .rules import Rule
+from .backtest_frames import _source_bar_ids_for_df
+from .rules import Rule, sequence_rule_partition_full
 
 __all__ = [
     "_max_bars_ago_needed",
@@ -525,10 +526,157 @@ def _compile_rule_signal_array(rule: Any, subs: Dict[str, "pd.DataFrame"], prev_
         return None
 
 
-def _compile_group_signal_array(rules: List[Any], join_mode: str, subs: Dict[str, "pd.DataFrame"], prev_source_row_by_tf: Dict[str, Optional[np.ndarray]], base_len: int) -> Optional[np.ndarray]:
+def _sequence_tabs_present(group_rule_join_mode: Dict[str, List[str]]) -> Set[str]:
+    out: Set[str] = set()
+    for tab_name, modes in dict(group_rule_join_mode or {}).items():
+        try:
+            if any(str(mode or "").upper().strip() == "SEQUENCE" for mode in (modes or [])):
+                out.add(str(tab_name or "").strip())
+        except Exception:
+            continue
+    return out
+
+
+def _sequence_compile_allowed_for_tab(tab_name: str, group_rule_join_mode: Dict[str, List[str]]) -> bool:
+    tab = str(tab_name or "").strip()
+    if not tab:
+        return False
+    seq_tabs = _sequence_tabs_present(group_rule_join_mode)
+    if tab not in seq_tabs:
+        return True
+    if tab in {"Long Entry", "Short Entry"} and {"Long Entry", "Short Entry"}.issubset(seq_tabs):
+        return False
+    return True
+
+
+def _compile_sequence_group_signal_array(
+    rules: List[Any],
+    *,
+    subs: Dict[str, "pd.DataFrame"],
+    prev_source_row_by_tf: Dict[str, Optional[np.ndarray]],
+    base_len: int,
+) -> Optional[np.ndarray]:
+    seq_rules, gate_rules, cancel_rules = sequence_rule_partition_full(list(rules or []))
+    if not seq_rules:
+        fallback_rules = list(gate_rules or ()) + list(cancel_rules or ())
+        if not fallback_rules:
+            return np.zeros(int(base_len), dtype=bool)
+        compiled_fallback: List[np.ndarray] = []
+        for rule in fallback_rules:
+            arr = _compile_rule_signal_array(rule, subs, prev_source_row_by_tf, base_len)
+            if arr is None:
+                return None
+            compiled_fallback.append(arr)
+        out = compiled_fallback[0].copy()
+        for arr in compiled_fallback[1:]:
+            out &= arr
+        return out
+
+    compiled_seq: List[np.ndarray] = []
+    seq_source_ids: List[np.ndarray] = []
+    source_ids_by_tf: Dict[str, np.ndarray] = {}
+    for rule in seq_rules:
+        arr = _compile_rule_signal_array(rule, subs, prev_source_row_by_tf, base_len)
+        if arr is None:
+            return None
+        tf = str(getattr(rule, "timeframe", "") or "").strip()
+        dft = subs.get(tf)
+        if dft is None or dft.empty:
+            return None
+        ids = source_ids_by_tf.get(tf)
+        if ids is None:
+            ids = _source_bar_ids_for_df(dft, tf)
+            if ids is None or len(ids) != int(base_len):
+                return None
+            source_ids_by_tf[tf] = ids
+        compiled_seq.append(arr)
+        seq_source_ids.append(ids)
+
+    compiled_gates: List[np.ndarray] = []
+    for rule in gate_rules:
+        arr = _compile_rule_signal_array(rule, subs, prev_source_row_by_tf, base_len)
+        if arr is None:
+            return None
+        compiled_gates.append(arr)
+
+    compiled_cancelers: List[np.ndarray] = []
+    for rule in cancel_rules:
+        arr = _compile_rule_signal_array(rule, subs, prev_source_row_by_tf, base_len)
+        if arr is None:
+            return None
+        compiled_cancelers.append(arr)
+
+    out = np.zeros(int(base_len), dtype=bool)
+    progress = 0
+    last_transition_bar_ms: Optional[int] = None
+    total_steps = len(compiled_seq)
+
+    for j in range(int(base_len)):
+        if progress > 0 and compiled_cancelers:
+            canceled = False
+            for arr in compiled_cancelers:
+                if bool(arr[j]):
+                    progress = 0
+                    last_transition_bar_ms = None
+                    canceled = True
+                    break
+            if canceled:
+                continue
+
+        step_arr = compiled_seq[progress]
+        if not bool(step_arr[j]):
+            continue
+
+        cur_bar_ms: Optional[int] = None
+        try:
+            cur_bar_ms = int(seq_source_ids[progress][j])
+        except Exception:
+            cur_bar_ms = None
+
+        if (
+            cur_bar_ms is not None
+            and last_transition_bar_ms is not None
+            and int(cur_bar_ms) <= int(last_transition_bar_ms)
+        ):
+            continue
+
+        next_progress = progress + 1
+        last_transition_bar_ms = cur_bar_ms
+        if next_progress >= total_steps:
+            gate_ok = True
+            for arr in compiled_gates:
+                if not bool(arr[j]):
+                    gate_ok = False
+                    break
+            out[j] = bool(gate_ok)
+            progress = 0
+            last_transition_bar_ms = None
+        else:
+            progress = next_progress
+
+    return out
+
+
+def _compile_group_signal_array(
+    rules: List[Any],
+    join_mode: str,
+    subs: Dict[str, "pd.DataFrame"],
+    prev_source_row_by_tf: Dict[str, Optional[np.ndarray]],
+    base_len: int,
+    *,
+    tab_name: str = "",
+    group_rule_join_mode: Optional[Dict[str, List[str]]] = None,
+) -> Optional[np.ndarray]:
     jm = str(join_mode or "OR").upper().strip()
     if jm == "SEQUENCE":
-        return None
+        if not _sequence_compile_allowed_for_tab(tab_name, dict(group_rule_join_mode or {})):
+            return None
+        return _compile_sequence_group_signal_array(
+            rules,
+            subs=subs,
+            prev_source_row_by_tf=prev_source_row_by_tf,
+            base_len=base_len,
+        )
     if not rules:
         return np.zeros(int(base_len), dtype=bool)
     compiled_rules: List[np.ndarray] = []
@@ -568,7 +716,15 @@ def _compile_tab_signal_array(tab_name: str, rules_model: Dict[str, List[List[An
     compiled_groups: List[np.ndarray] = []
     for gi, group in enumerate(groups):
         jm = group_modes[gi] if gi < len(group_modes) else "OR"
-        arr = _compile_group_signal_array(group, jm, subs, prev_source_row_by_tf, base_len)
+        arr = _compile_group_signal_array(
+            group,
+            jm,
+            subs,
+            prev_source_row_by_tf,
+            base_len,
+            tab_name=tab_name,
+            group_rule_join_mode=group_rule_join_mode,
+        )
         if arr is None:
             return None
         compiled_groups.append(arr)
@@ -610,7 +766,15 @@ def _compile_tab_group_signal_arrays(
         failed = False
         for gi, group in enumerate(groups):
             jm = group_modes[gi] if gi < len(group_modes) else "OR"
-            arr = _compile_group_signal_array(group, jm, subs, prev_source_row_by_tf, base_len)
+            arr = _compile_group_signal_array(
+                group,
+                jm,
+                subs,
+                prev_source_row_by_tf,
+                base_len,
+                tab_name=tab_name,
+                group_rule_join_mode=group_rule_join_mode,
+            )
             if arr is None:
                 failed = True
                 break

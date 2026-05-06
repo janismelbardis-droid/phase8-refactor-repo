@@ -50,13 +50,40 @@ class FastBacktestTests(unittest.TestCase):
             "Short Exit": [[long_rule]],
         }
 
-    def test_strategy_plan_falls_back_for_sequence(self) -> None:
+    def test_strategy_plan_compiles_safe_one_sided_sequence(self) -> None:
         rules_model = self._rules_model()
         plan = compile_strategy_plan(
             rules_model,
             tab_group_join_mode={name: "AND" for name in rules_model},
             group_rule_join_mode={name: (["SEQUENCE"] if name == "Long Entry" else ["OR"]) for name in rules_model},
             entry_filters={},
+            backtest_cfg=BacktestConfig(stop_loss_mode="OFF", take_profit_mode="OFF"),
+        )
+        self.assertEqual(plan.engine, FAST_BAR_ENGINE)
+        self.assertNotIn("sequence_groups", plan.blockers)
+
+    def test_strategy_plan_keeps_sequence_with_active_entry_filter_on_generic_engine(self) -> None:
+        rules_model = self._rules_model()
+        plan = compile_strategy_plan(
+            rules_model,
+            tab_group_join_mode={name: "AND" for name in rules_model},
+            group_rule_join_mode={name: (["SEQUENCE"] if name == "Long Entry" else ["OR"]) for name in rules_model},
+            entry_filters={
+                "Long Entry": {
+                    "enabled": True,
+                    "mode": "RETRACE_ALWAYS",
+                    "expansion_atr_mult": 2.0,
+                    "hard_skip_atr_mult": 0.0,
+                    "confirm_bars": 1,
+                    "reference_range": "FULL_CANDLE",
+                    "touch_type": "WICK",
+                    "min_retrace_pct": 35.0,
+                    "max_retrace_pct": 100.0,
+                    "require_next_close_beyond_mid": False,
+                    "require_setup_still_valid": False,
+                    "apply_to_reversals": True,
+                }
+            },
             backtest_cfg=BacktestConfig(stop_loss_mode="OFF", take_profit_mode="OFF"),
         )
         self.assertEqual(plan.engine, FALLBACK_ENGINE)

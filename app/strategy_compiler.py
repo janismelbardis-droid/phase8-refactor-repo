@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from .backtest_execution import _normalize_exit_mode
 from .backtest_models import BacktestConfig
-from .backtest_planning import _tab_uses_sequence, compiled_rule_support
+from .backtest_planning import _sequence_compile_allowed_for_tab, _tab_uses_sequence, compiled_rule_support
 from .rules import EntryFilterConfig, ENTRY_FILTER_TABS, normalize_entry_filter_payload
 from .strategy_requirements import StreamRequirementSpec, compile_stream_requirements
 
@@ -153,7 +153,18 @@ def compile_strategy_plan(
         if _tab_uses_sequence(dict(group_rule_join_mode or {}), tab_name)
     )
     entry_filter_tabs = _active_entry_filter_tabs(entry_filters)
-
+    compiled_sequence_tabs = tuple(
+        tab_name
+        for tab_name in sequence_tabs
+        if _sequence_compile_allowed_for_tab(tab_name, dict(group_rule_join_mode or {}))
+        and tab_name not in entry_filter_tabs
+    )
+    compiled_tabs = tuple(
+        tab_name
+        for tab_name in active_tabs
+        if all(item.supported for item in rule_support if item.tab_name == tab_name)
+        and (tab_name not in sequence_tabs or tab_name in compiled_sequence_tabs)
+    )
     stop_mode = _normalize_exit_mode(getattr(cfg, "stop_loss_mode", "OFF"), is_take_profit=False)
     take_mode = _normalize_exit_mode(getattr(cfg, "take_profit_mode", "OFF"), is_take_profit=True)
     step_timeframe = str(getattr(cfg, "step_timeframe", "1m") or "1m").strip() or "1m"
@@ -165,9 +176,13 @@ def compile_strategy_plan(
     if unsupported:
         blockers.append("unsupported_rules")
         notes.append(f"{len(unsupported)} rule(s) require generic evaluation.")
-    if sequence_tabs:
+    unsupported_sequence_tabs = tuple(tab_name for tab_name in sequence_tabs if tab_name not in compiled_sequence_tabs)
+    if unsupported_sequence_tabs:
         blockers.append("sequence_groups")
-        notes.append("Sequence groups need stateful generic evaluation.")
+        if any(tab_name in entry_filter_tabs for tab_name in unsupported_sequence_tabs):
+            notes.append("Sequence groups with active entry filters stay on the generic engine.")
+        else:
+            notes.append("Sequence groups need stateful generic evaluation.")
     if stop_mode not in FAST_BAR_EXIT_MODES:
         blockers.append(f"stop_mode:{stop_mode}")
         notes.append(f"Stop-loss mode '{stop_mode}' is not yet supported by the compiled bar engine.")

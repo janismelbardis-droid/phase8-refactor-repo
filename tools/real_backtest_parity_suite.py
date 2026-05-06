@@ -56,11 +56,11 @@ CASES: List[ParityCase] = [
         preset="902",
         start="2026-04-20 00:00:00+00:00",
         end="2026-04-20 04:00:00+00:00",
-        expected_engine="legacy_generic",
+        expected_engine="compiled_bar",
         expected_ending_balance=1000.4445208379417,
         expected_num_trades=2,
         expected_exit_reason_counts={"Long Exit": 1, "Force Close (End)": 1},
-        expected_plan_blockers=["sequence_groups"],
+        expected_plan_blockers=[],
     ),
 ]
 

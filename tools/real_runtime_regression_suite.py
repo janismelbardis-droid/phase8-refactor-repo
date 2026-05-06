@@ -277,7 +277,7 @@ def _pullback_variant_case(*, python_exe: str, output_dir: Path) -> Dict[str, An
             f"best_balance={best_result.get('ending_balance')}",
         ),
         _make_check("pullback_variant_best_trades", _safe_int(best_result.get("num_trades")) == 1, f"best_trades={best_result.get('num_trades')}"),
-        _make_check("pullback_variant_legacy_path", bool(top_engines) and all(engine == "legacy_generic" for engine in top_engines), f"engines={top_engines}"),
+        _make_check("pullback_variant_generic_path_with_filters", bool(top_engines) and all(engine == "legacy_generic" for engine in top_engines), f"engines={top_engines}"),
     ]
     return {
         "label": "pullback_variant_probe",

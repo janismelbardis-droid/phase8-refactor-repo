@@ -34,6 +34,7 @@ from .backtest import (
 )
 from .backtest_planning import _compile_tab_group_signal_arrays, _compile_tab_signal_arrays
 from .backtest_reporting import _apply_trade_reporting_metrics, build_backtest_replay_strategy_signature
+from .rules import EntryFilterConfig
 from .strategy_compiler import FAST_BAR_ENGINE, _compiled_safe_entry_filter_tabs, compile_strategy_plan
 from .utils_time import interval_to_ms
 
@@ -1253,10 +1254,19 @@ def run_backtest_compiled_plan(
         signal_row: int,
         current_step: int,
         matched_group_indices: Optional[List[int]],
+        *,
+        reversal_only: bool = False,
+        origin: str = "ENTRY",
     ) -> bool:
         side_text = str(side).upper()
         tab_name = "Long Entry" if side_text == "LONG" else "Short Entry"
         cfgs_side = _entry_filter_cfgs_for_groups(entry_filter_cfg_map, tab_name, matched_group_indices)
+        if reversal_only:
+            cfgs_side = [
+                cfg
+                for cfg in cfgs_side
+                if isinstance(cfg, EntryFilterConfig) and cfg.is_active() and cfg.apply_to_reversals
+            ]
         sig_bar = _bar_info_at(step_bars, signal_time)
         decision, detail, confirm_bars = _combine_entry_filter_signal_decisions(side_text, cfgs_side, sig_bar)
         if decision == "ALLOW":
@@ -1268,7 +1278,7 @@ def run_backtest_compiled_plan(
         if decision == "WAIT" and sig_bar is not None:
             pending[side_text] = _pending_from_signal(
                 side=side_text,
-                origin="ENTRY",
+                origin=str(origin).upper(),
                 signal_time=signal_time,
                 signal_bar=sig_bar,
                 signal_snapshot=None,
@@ -1282,6 +1292,19 @@ def run_backtest_compiled_plan(
                 matched_group_indices=matched_group_indices,
             )
         return False
+
+    def _compiled_reversal_filter_cfgs(
+        side: str,
+        matched_group_indices: Optional[List[int]],
+    ) -> List[EntryFilterConfig]:
+        side_text = str(side).upper()
+        tab_name = "Long Entry" if side_text == "LONG" else "Short Entry"
+        cfgs_side = _entry_filter_cfgs_for_groups(entry_filter_cfg_map, tab_name, matched_group_indices)
+        return [
+            cfg
+            for cfg in cfgs_side
+            if isinstance(cfg, EntryFilterConfig) and cfg.is_active() and cfg.apply_to_reversals
+        ]
 
     def _close_position(ts_ns: int, fill_price_raw: float, reason: str, *, ambiguous: bool = False, exit_row_index: Optional[int] = None) -> None:
         nonlocal balance, pos_side, qty, entry_price, entry_time_ns, entry_reason, fee_entry
@@ -1501,6 +1524,12 @@ def run_backtest_compiled_plan(
                         tab_name = str(getattr(pending_entry, "tab_name", ("Long Entry" if side == "LONG" else "Short Entry")) or ("Long Entry" if side == "LONG" else "Short Entry"))
                         pending_groups = list(getattr(pending_entry, "matched_group_indices", []) or [])
                         cfgs_side = _entry_filter_cfgs_for_groups(entry_filter_cfg_map, tab_name, pending_groups)
+                        if str(getattr(pending_entry, "origin", "ENTRY") or "ENTRY").upper() == "REVERSE":
+                            cfgs_side = [
+                                cfg
+                                for cfg in cfgs_side
+                                if isinstance(cfg, EntryFilterConfig) and cfg.is_active() and cfg.apply_to_reversals
+                            ]
                         current_group_indices = long_entry_groups if side == "LONG" else short_entry_groups
                         setup_still_valid = _setup_still_valid_from_matches(
                             pending_groups,
@@ -1531,15 +1560,43 @@ def run_backtest_compiled_plan(
             if pos_side > 0:
                 if short_entry and allow_reverse and can_schedule_next:
                     scheduled_close_reason = "Reverse to Short"
-                    scheduled_open_side = "SHORT"
-                    scheduled_open_reason = "Reverse to Short"
+                    if _compiled_reversal_filter_cfgs("SHORT", short_entry_groups):
+                        scheduled_open_side = None
+                        scheduled_open_reason = ""
+                        _start_pending_or_schedule(
+                            "SHORT",
+                            "Reverse to Short",
+                            bar_time,
+                            j,
+                            current_step,
+                            short_entry_groups,
+                            reversal_only=True,
+                            origin="REVERSE",
+                        )
+                    else:
+                        scheduled_open_side = "SHORT"
+                        scheduled_open_reason = "Reverse to Short"
                 elif long_exit and can_schedule_next:
                     scheduled_close_reason = "Long Exit"
             elif pos_side < 0:
                 if long_entry and allow_reverse and can_schedule_next:
                     scheduled_close_reason = "Reverse to Long"
-                    scheduled_open_side = "LONG"
-                    scheduled_open_reason = "Reverse to Long"
+                    if _compiled_reversal_filter_cfgs("LONG", long_entry_groups):
+                        scheduled_open_side = None
+                        scheduled_open_reason = ""
+                        _start_pending_or_schedule(
+                            "LONG",
+                            "Reverse to Long",
+                            bar_time,
+                            j,
+                            current_step,
+                            long_entry_groups,
+                            reversal_only=True,
+                            origin="REVERSE",
+                        )
+                    else:
+                        scheduled_open_side = "LONG"
+                        scheduled_open_reason = "Reverse to Long"
                 elif short_exit and can_schedule_next:
                     scheduled_close_reason = "Short Exit"
             else:

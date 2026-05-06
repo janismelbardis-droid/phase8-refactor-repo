@@ -335,8 +335,8 @@ def _pullback_variant_case(*, python_exe: str, output_dir: Path) -> Dict[str, An
         _make_check("pullback_variant_best_trades", _safe_int(best_result.get("num_trades")) == 1, f"best_trades={best_result.get('num_trades')}"),
         _make_check("pullback_variant_baseline_compiled", engine_by_variant.get("baseline") == "compiled_bar", f"engines={engine_by_variant}"),
         _make_check(
-            "pullback_variant_filtered_variants_generic",
-            all(engine_by_variant.get(name) == "legacy_generic" for name in requested_names if name != "baseline"),
+            "pullback_variant_requested_variants_compiled",
+            all(engine_by_variant.get(name) == "compiled_bar" for name in requested_names),
             f"engines={engine_by_variant}",
         ),
     ]

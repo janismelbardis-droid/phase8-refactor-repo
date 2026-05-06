@@ -179,15 +179,6 @@ def compile_strategy_plan(
     )
     entry_filter_tabs = _active_entry_filter_tabs(entry_filters)
     compiled_entry_filter_tabs = _compiled_safe_entry_filter_tabs(entry_filters, cfg)
-    if bool(getattr(cfg, "allow_reverse", False)):
-        compiled_entry_filter_tabs = tuple(
-            tab_name
-            for tab_name in compiled_entry_filter_tabs
-            if not (
-                (tab_name == "Long Entry" and "Short Entry" in active_tabs)
-                or (tab_name == "Short Entry" and "Long Entry" in active_tabs)
-            )
-        )
     compiled_sequence_tabs = tuple(
         tab_name
         for tab_name in sequence_tabs

@@ -41,7 +41,7 @@ class EntryFilterConfig:
     """
 
     enabled: bool = False
-    mode: str = "OFF"            # OFF | ANTI_CHASE | RETRACE_ON_EXPANSION | RETRACE_ALWAYS
+    mode: str = "OFF"            # OFF | ANTI_CHASE | RETRACE_ON_EXPANSION | RETRACE_ALWAYS | CASEBOOK_PULLBACK_V1
     expansion_atr_mult: float = 2.0
     hard_skip_atr_mult: float = 3.0
     confirm_bars: int = 3
@@ -52,6 +52,17 @@ class EntryFilterConfig:
     require_next_close_beyond_mid: bool = True
     require_setup_still_valid: bool = True
     apply_to_reversals: bool = True
+    casebook_anchor_lookback_bars: int = 30
+    casebook_min_signal_bars: int = 0
+    casebook_max_signal_bars: int = 0
+    casebook_pullback_window_bars: int = 18
+    casebook_reclaim_window_bars: int = 4
+    casebook_max_vidya_gap_pct: float = 0.25
+    casebook_require_t0_vidya_buy: bool = True
+    casebook_require_t0_rf_buy: bool = True
+    casebook_require_vidya_buy_through_signal: bool = True
+    casebook_simple_reclaim_phases: Tuple[str, ...] = ("BUY_WEAK", "NEUTRAL")
+    casebook_delayed_rf_buy_phases: Tuple[str, ...] = ("SELL_WEAK", "SELL_STRONG")
 
     @staticmethod
     def _normalize_mode_value(mode: Any) -> str:
@@ -64,9 +75,11 @@ class EntryFilterConfig:
             "PULLBACK": "RETRACE_ALWAYS",
             "PRICE_PULLBACK": "RETRACE_ALWAYS",
             "REQUIRE_PULLBACK": "RETRACE_ALWAYS",
+            "CASEBOOK": "CASEBOOK_PULLBACK_V1",
+            "REFERENCE_PULLBACK": "CASEBOOK_PULLBACK_V1",
         }
         raw = alias_map.get(raw, raw)
-        return raw if raw in ("OFF", "ANTI_CHASE", "RETRACE_ON_EXPANSION", "RETRACE_ALWAYS") else "OFF"
+        return raw if raw in ("OFF", "ANTI_CHASE", "RETRACE_ON_EXPANSION", "RETRACE_ALWAYS", "CASEBOOK_PULLBACK_V1") else "OFF"
 
     @staticmethod
     def _normalize_reference_range_value(value: Any) -> str:
@@ -139,6 +152,51 @@ class EntryFilterConfig:
         cfg.require_next_close_beyond_mid = bool(cfg.require_next_close_beyond_mid)
         cfg.require_setup_still_valid = bool(cfg.require_setup_still_valid)
         cfg.apply_to_reversals = bool(cfg.apply_to_reversals)
+        try:
+            cfg.casebook_anchor_lookback_bars = max(2, int(cfg.casebook_anchor_lookback_bars))
+        except Exception:
+            cfg.casebook_anchor_lookback_bars = 30
+        try:
+            cfg.casebook_min_signal_bars = max(0, int(cfg.casebook_min_signal_bars))
+        except Exception:
+            cfg.casebook_min_signal_bars = 0
+        try:
+            cfg.casebook_max_signal_bars = max(0, int(cfg.casebook_max_signal_bars))
+        except Exception:
+            cfg.casebook_max_signal_bars = 0
+        if cfg.casebook_max_signal_bars > 0 and cfg.casebook_max_signal_bars < cfg.casebook_min_signal_bars:
+            cfg.casebook_max_signal_bars = int(cfg.casebook_min_signal_bars)
+        try:
+            cfg.casebook_pullback_window_bars = max(2, int(cfg.casebook_pullback_window_bars))
+        except Exception:
+            cfg.casebook_pullback_window_bars = 18
+        try:
+            cfg.casebook_reclaim_window_bars = max(1, int(cfg.casebook_reclaim_window_bars))
+        except Exception:
+            cfg.casebook_reclaim_window_bars = 4
+        try:
+            cfg.casebook_max_vidya_gap_pct = max(0.0, float(cfg.casebook_max_vidya_gap_pct))
+        except Exception:
+            cfg.casebook_max_vidya_gap_pct = 0.25
+        cfg.casebook_require_t0_vidya_buy = bool(cfg.casebook_require_t0_vidya_buy)
+        cfg.casebook_require_t0_rf_buy = bool(cfg.casebook_require_t0_rf_buy)
+        cfg.casebook_require_vidya_buy_through_signal = bool(cfg.casebook_require_vidya_buy_through_signal)
+        def _normalize_phase_seq(value: Any, default: Tuple[str, ...]) -> Tuple[str, ...]:
+            raw_items: List[str] = []
+            if isinstance(value, (list, tuple)):
+                raw_items = [str(item or "").upper().strip() for item in value]
+            elif isinstance(value, str):
+                raw_items = [part.upper().strip() for part in value.split(",")]
+            cleaned = tuple(part for part in raw_items if part)
+            return cleaned or tuple(default)
+        cfg.casebook_simple_reclaim_phases = _normalize_phase_seq(
+            cfg.casebook_simple_reclaim_phases,
+            ("BUY_WEAK", "NEUTRAL"),
+        )
+        cfg.casebook_delayed_rf_buy_phases = _normalize_phase_seq(
+            cfg.casebook_delayed_rf_buy_phases,
+            ("SELL_WEAK", "SELL_STRONG"),
+        )
         cfg.enabled = bool(cfg.enabled)
         return cfg
 
@@ -156,6 +214,17 @@ class EntryFilterConfig:
             "require_next_close_beyond_mid": bool(self.require_next_close_beyond_mid),
             "require_setup_still_valid": bool(self.require_setup_still_valid),
             "apply_to_reversals": bool(self.apply_to_reversals),
+            "casebook_anchor_lookback_bars": int(self.casebook_anchor_lookback_bars),
+            "casebook_min_signal_bars": int(self.casebook_min_signal_bars),
+            "casebook_max_signal_bars": int(self.casebook_max_signal_bars),
+            "casebook_pullback_window_bars": int(self.casebook_pullback_window_bars),
+            "casebook_reclaim_window_bars": int(self.casebook_reclaim_window_bars),
+            "casebook_max_vidya_gap_pct": float(self.casebook_max_vidya_gap_pct),
+            "casebook_require_t0_vidya_buy": bool(self.casebook_require_t0_vidya_buy),
+            "casebook_require_t0_rf_buy": bool(self.casebook_require_t0_rf_buy),
+            "casebook_require_vidya_buy_through_signal": bool(self.casebook_require_vidya_buy_through_signal),
+            "casebook_simple_reclaim_phases": [str(part) for part in self.casebook_simple_reclaim_phases],
+            "casebook_delayed_rf_buy_phases": [str(part) for part in self.casebook_delayed_rf_buy_phases],
         }
 
     @classmethod
@@ -178,6 +247,17 @@ class EntryFilterConfig:
             require_next_close_beyond_mid=bool(d.get("require_next_close_beyond_mid", True)),
             require_setup_still_valid=bool(d.get("require_setup_still_valid", True)),
             apply_to_reversals=bool(d.get("apply_to_reversals", True)),
+            casebook_anchor_lookback_bars=int(_raw("casebook_anchor_lookback_bars", 30)),
+            casebook_min_signal_bars=int(_raw("casebook_min_signal_bars", 0)),
+            casebook_max_signal_bars=int(_raw("casebook_max_signal_bars", 0)),
+            casebook_pullback_window_bars=int(_raw("casebook_pullback_window_bars", 18)),
+            casebook_reclaim_window_bars=int(_raw("casebook_reclaim_window_bars", 4)),
+            casebook_max_vidya_gap_pct=float(_raw("casebook_max_vidya_gap_pct", 0.25)),
+            casebook_require_t0_vidya_buy=bool(d.get("casebook_require_t0_vidya_buy", True)),
+            casebook_require_t0_rf_buy=bool(d.get("casebook_require_t0_rf_buy", True)),
+            casebook_require_vidya_buy_through_signal=bool(d.get("casebook_require_vidya_buy_through_signal", True)),
+            casebook_simple_reclaim_phases=tuple(d.get("casebook_simple_reclaim_phases", ("BUY_WEAK", "NEUTRAL"))),
+            casebook_delayed_rf_buy_phases=tuple(d.get("casebook_delayed_rf_buy_phases", ("SELL_WEAK", "SELL_STRONG"))),
         )
         return cfg.normalized_copy()
 
@@ -206,6 +286,12 @@ class EntryFilterConfig:
             if cfg.requires_atr() and cfg.normalized_mode() == "RETRACE_ON_EXPANSION":
                 parts.insert(1, f"{cfg.expansion_atr_mult:.2f} ATR")
             return " · ".join(parts)
+        if cfg.normalized_mode() == "CASEBOOK_PULLBACK_V1":
+            return (
+                f"Casebook pullback · {int(cfg.casebook_pullback_window_bars)} bar pullback"
+                f" · {int(cfg.casebook_reclaim_window_bars)} bar reclaim"
+                f" · max vidya gap {float(cfg.casebook_max_vidya_gap_pct):.2f}%"
+            )
         return cfg.normalized_mode().replace("_", " ").title()
 
     def badge_text(self) -> str:

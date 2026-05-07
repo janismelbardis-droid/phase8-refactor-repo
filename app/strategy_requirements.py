@@ -340,6 +340,18 @@ def compile_stream_requirements(
                 if enabled and (mode in ("ANTI_CHASE", "RETRACE_ON_EXPANSION") or hard_skip > 0.0):
                     spec.required_families.update(_expand_families([FAMILY_ATR]))
                     spec.required_fields.add("atr")
+                if enabled and mode == "CASEBOOK_PULLBACK_V1":
+                    spec.required_families.update(_expand_families([FAMILY_OHLCV, FAMILY_VIDYA, FAMILY_RANGE_FILTER]))
+                    spec.required_fields.update({
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "vidya_line",
+                        "vidya_state",
+                        "range_filter_state",
+                        "range_filter_phase",
+                    })
 
     cfg = backtest_cfg
     if cfg is not None:

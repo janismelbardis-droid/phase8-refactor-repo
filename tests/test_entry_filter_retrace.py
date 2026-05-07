@@ -90,6 +90,152 @@ class EntryFilterRetraceTests(unittest.TestCase):
             ("BLOCK", "retrace:120.0%"),
         )
 
+    def test_casebook_pullback_confirm_simple_reclaim(self) -> None:
+        cfg = EntryFilterConfig(
+            enabled=True,
+            mode="CASEBOOK_PULLBACK_V1",
+            min_retrace_pct=0.0,
+            casebook_pullback_window_bars=6,
+            casebook_reclaim_window_bars=4,
+            casebook_max_vidya_gap_pct=0.25,
+            casebook_require_t0_vidya_buy=True,
+            casebook_require_t0_rf_buy=True,
+            casebook_require_vidya_buy_through_signal=True,
+            require_setup_still_valid=False,
+        ).normalized_copy()
+        idx = pd.date_range("2026-01-01T00:00:00Z", periods=4, freq="1min", tz="UTC")
+        stream = pd.DataFrame(
+            {
+                "open": [100.0, 109.0, 108.0, 100.0],
+                "high": [110.0, 109.5, 102.0, 104.0],
+                "low": [100.0, 107.0, 98.0, 99.5],
+                "close": [109.0, 108.0, 101.0, 103.0],
+                "vidya_line": [99.8, 99.0, 97.9, 98.5],
+                "vidya_state": ["BUY", "BUY", "BUY", "BUY"],
+                "range_filter_state": ["BUY", "BUY", "BUY", "BUY"],
+                "range_filter_phase": ["BUY_STRONG", "BUY_WEAK", "BUY_WEAK", "BUY_WEAK"],
+                "range_filter_buy": [1, 0, 0, 0],
+                "range_filter_sell": [0, 0, 0, 0],
+                "vidya_trend_up": [1, 0, 0, 0],
+                "vidya_trend_down": [0, 0, 0, 0],
+            },
+            index=idx,
+        )
+        signal_bar = _EntryFilterBar(time=idx[0], open=100.0, high=110.0, low=100.0, close=109.0, atr=2.0)
+        confirm_bar = _EntryFilterBar(time=idx[3], open=100.0, high=104.0, low=99.5, close=103.0, atr=2.0)
+
+        self.assertEqual(_entry_filter_signal_decision("LONG", cfg, signal_bar)[0], "WAIT")
+        self.assertEqual(
+            _entry_filter_confirm_decision(
+                "LONG",
+                cfg,
+                signal_bar,
+                confirm_bar,
+                True,
+                signal_row_index=0,
+                confirm_row_index=3,
+                stream_1m=stream,
+            ),
+            ("ALLOW", "casebook-reclaim"),
+        )
+
+    def test_casebook_pullback_confirm_delayed_rf_buy(self) -> None:
+        cfg = EntryFilterConfig(
+            enabled=True,
+            mode="CASEBOOK_PULLBACK_V1",
+            min_retrace_pct=0.0,
+            casebook_pullback_window_bars=8,
+            casebook_reclaim_window_bars=4,
+            casebook_max_vidya_gap_pct=0.25,
+            casebook_require_t0_vidya_buy=True,
+            casebook_require_t0_rf_buy=True,
+            casebook_require_vidya_buy_through_signal=True,
+            require_setup_still_valid=False,
+        ).normalized_copy()
+        idx = pd.date_range("2026-01-01T00:00:00Z", periods=5, freq="1min", tz="UTC")
+        stream = pd.DataFrame(
+            {
+                "open": [100.0, 108.0, 106.0, 101.0, 102.0],
+                "high": [110.0, 108.5, 106.5, 102.0, 103.0],
+                "low": [100.0, 102.0, 99.0, 100.0, 101.0],
+                "close": [109.0, 103.0, 100.5, 101.5, 102.5],
+                "vidya_line": [99.8, 99.2, 98.9, 99.4, 100.2],
+                "vidya_state": ["BUY", "BUY", "BUY", "BUY", "BUY"],
+                "range_filter_state": ["BUY", "SELL", "SELL", "SELL", "BUY"],
+                "range_filter_phase": ["BUY_STRONG", "SELL_WEAK", "SELL_WEAK", "SELL_WEAK", "BUY_WEAK"],
+                "range_filter_buy": [1, 0, 0, 0, 0],
+                "range_filter_sell": [0, 1, 0, 0, 0],
+                "vidya_trend_up": [1, 0, 0, 0, 0],
+                "vidya_trend_down": [0, 0, 0, 0, 0],
+            },
+            index=idx,
+        )
+        signal_bar = _EntryFilterBar(time=idx[0], open=100.0, high=110.0, low=100.0, close=109.0, atr=2.0)
+        confirm_bar = _EntryFilterBar(time=idx[4], open=102.0, high=103.0, low=101.0, close=102.5, atr=2.0)
+
+        self.assertEqual(
+            _entry_filter_confirm_decision(
+                "LONG",
+                cfg,
+                signal_bar,
+                confirm_bar,
+                True,
+                signal_row_index=0,
+                confirm_row_index=4,
+                stream_1m=stream,
+            ),
+            ("ALLOW", "casebook-rf-buy"),
+        )
+
+    def test_casebook_pullback_backtracks_anchor_before_late_signal_row(self) -> None:
+        cfg = EntryFilterConfig(
+            enabled=True,
+            mode="CASEBOOK_PULLBACK_V1",
+            min_retrace_pct=0.0,
+            casebook_anchor_lookback_bars=8,
+            casebook_pullback_window_bars=8,
+            casebook_reclaim_window_bars=4,
+            casebook_max_vidya_gap_pct=0.25,
+            casebook_require_t0_vidya_buy=True,
+            casebook_require_t0_rf_buy=True,
+            casebook_require_vidya_buy_through_signal=True,
+            require_setup_still_valid=False,
+        ).normalized_copy()
+        idx = pd.date_range("2026-01-01T00:00:00Z", periods=8, freq="1min", tz="UTC")
+        stream = pd.DataFrame(
+            {
+                "open": [100.0, 100.5, 109.0, 108.0, 101.0, 100.2, 100.4, 100.6],
+                "high": [100.7, 101.0, 110.0, 108.3, 102.0, 101.0, 103.0, 104.0],
+                "low": [99.9, 100.3, 100.0, 99.4, 99.6, 99.8, 100.2, 100.5],
+                "close": [100.5, 100.8, 109.0, 101.0, 100.1, 100.5, 102.5, 103.5],
+                "vidya_line": [99.7, 99.9, 99.8, 99.2, 99.3, 99.4, 99.8, 100.1],
+                "vidya_state": ["BUY"] * 8,
+                "range_filter_state": ["BUY", "BUY", "BUY", "BUY", "BUY", "BUY", "BUY", "BUY"],
+                "range_filter_phase": ["BUY_STRONG", "BUY_STRONG", "BUY_STRONG", "BUY_WEAK", "BUY_WEAK", "BUY_WEAK", "BUY_WEAK", "BUY_WEAK"],
+                "range_filter_buy": [0, 1, 0, 0, 0, 0, 0, 0],
+                "range_filter_sell": [0] * 8,
+                "vidya_trend_up": [0, 0, 1, 0, 0, 0, 0, 0],
+                "vidya_trend_down": [0] * 8,
+            },
+            index=idx,
+        )
+        signal_bar = _EntryFilterBar(time=idx[5], open=100.2, high=101.0, low=99.8, close=100.5, atr=2.0)
+        confirm_bar = _EntryFilterBar(time=idx[7], open=100.6, high=104.0, low=100.5, close=103.5, atr=2.0)
+
+        self.assertEqual(
+            _entry_filter_confirm_decision(
+                "LONG",
+                cfg,
+                signal_bar,
+                confirm_bar,
+                True,
+                signal_row_index=5,
+                confirm_row_index=7,
+                stream_1m=stream,
+            ),
+            ("ALLOW", "casebook-reclaim"),
+        )
+
     def test_run_backtest_retrace_filter_waits_across_multiple_bars(self) -> None:
         idx = pd.date_range("2026-01-01T00:00:00Z", periods=7, freq="1min", tz="UTC")
         df = pd.DataFrame(

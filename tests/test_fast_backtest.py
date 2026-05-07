@@ -500,6 +500,112 @@ class FastBacktestTests(unittest.TestCase):
         self.assertEqual([t.exit_reason for t in compiled.trades], [t.exit_reason for t in legacy.trades])
         self.assertAlmostEqual(float(compiled.summary["ending_balance"]), float(legacy.summary["ending_balance"]), places=8)
 
+    def test_compiled_engine_matches_legacy_for_sequence_with_casebook_pullback_filter(self) -> None:
+        idx = pd.date_range("2026-01-01T00:00:00Z", periods=6, freq="1min", tz="UTC")
+        df = pd.DataFrame(
+            {
+                "open": [100.0, 109.0, 108.0, 100.0, 103.0, 104.0],
+                "high": [110.0, 109.5, 102.0, 104.0, 105.0, 106.0],
+                "low": [100.0, 107.0, 98.0, 99.5, 102.0, 103.0],
+                "close": [109.0, 108.0, 101.0, 103.0, 104.0, 105.0],
+                "price": [109.0, 108.0, 101.0, 103.0, 104.0, 105.0],
+                "open_time": [ts - pd.Timedelta(minutes=1) + pd.Timedelta(milliseconds=1) for ts in idx],
+                "close_time": list(idx),
+                "volume": [10.0] * len(idx),
+                "range_filter_buy": [True, False, False, False, False, False],
+                "range_filter_sell": [False] * len(idx),
+                "range_filter_state": ["BUY", "BUY", "BUY", "BUY", "BUY", "BUY"],
+                "range_filter_phase": ["BUY_STRONG", "BUY_WEAK", "BUY_WEAK", "BUY_WEAK", "BUY_WEAK", "BUY_WEAK"],
+                "vidya_state": ["BUY"] * len(idx),
+                "vidya_line": [99.8, 99.0, 97.9, 98.5, 100.0, 101.0],
+            },
+            index=idx,
+        )
+        long_trigger = Rule(timeframe="1m", mode="event", field="range_filter_buy", op="EVENT", value=None, is_trigger=True)
+        long_gate_1 = Rule(timeframe="1m", mode="state", field="vidya_state", op="=", value="BUY")
+        long_gate_2 = Rule(timeframe="1m", mode="state", field="range_filter_state", op="=", value="BUY")
+        rules_model = {
+            "Long Entry": [[long_trigger, long_gate_1, long_gate_2]],
+            "Long Exit": [],
+            "Short Entry": [],
+            "Short Exit": [],
+        }
+        join_mode = {name: "AND" for name in rules_model}
+        group_rule_join_mode = {
+            "Long Entry": ["SEQUENCE"],
+            "Long Exit": [],
+            "Short Entry": [],
+            "Short Exit": [],
+        }
+        entry_filters = {
+            "Long Entry": {
+                "enabled": True,
+                "mode": "CASEBOOK_PULLBACK_V1",
+                "confirm_bars": 10,
+                "casebook_pullback_window_bars": 6,
+                "casebook_reclaim_window_bars": 4,
+                "casebook_max_vidya_gap_pct": 0.25,
+                "casebook_require_t0_vidya_buy": True,
+                "casebook_require_t0_rf_buy": True,
+                "casebook_require_vidya_buy_through_signal": True,
+                "require_setup_still_valid": False,
+                "apply_to_reversals": True,
+            }
+        }
+        cfg = BacktestConfig(
+            initial_balance=1000.0,
+            order_notional_usdt=100.0,
+            fee_rate=0.0,
+            slippage_bps=0.0,
+            stop_loss_mode="OFF",
+            take_profit_mode="OFF",
+            allow_reverse=False,
+            skip_if_both_entries=True,
+            step_timeframe="1m",
+            capture_trade_details=False,
+            equity_curve_stride=1,
+        )
+
+        plan = compile_strategy_plan(
+            rules_model,
+            tab_group_join_mode=join_mode,
+            group_rule_join_mode=group_rule_join_mode,
+            entry_filters=entry_filters,
+            backtest_cfg=cfg,
+        )
+        self.assertEqual(plan.engine, FAST_BAR_ENGINE)
+
+        legacy = run_backtest(
+            symbol="BTCUSDT",
+            streams_full={"1m": df.copy()},
+            start=df.index[0],
+            end=df.index[-1],
+            rules_model=rules_model,
+            tab_group_join_mode=join_mode,
+            group_rule_join_mode=group_rule_join_mode,
+            cfg=cfg,
+            df_1m_full=df.copy(),
+            entry_filters=entry_filters,
+        )
+        compiled = run_backtest_compiled_bar(
+            symbol="BTCUSDT",
+            streams_full={"1m": df.copy()},
+            start=df.index[0],
+            end=df.index[-1],
+            rules_model=rules_model,
+            tab_group_join_mode=join_mode,
+            group_rule_join_mode=group_rule_join_mode,
+            cfg=cfg,
+            entry_filters=entry_filters,
+        )
+
+        self.assertEqual([t.side for t in compiled.trades], [t.side for t in legacy.trades])
+        self.assertEqual([t.entry_time for t in compiled.trades], [t.entry_time for t in legacy.trades])
+        self.assertEqual([t.exit_time for t in compiled.trades], [t.exit_time for t in legacy.trades])
+        self.assertEqual([t.entry_reason for t in compiled.trades], [t.entry_reason for t in legacy.trades])
+        self.assertEqual([t.exit_reason for t in compiled.trades], [t.exit_reason for t in legacy.trades])
+        self.assertAlmostEqual(float(compiled.summary["ending_balance"]), float(legacy.summary["ending_balance"]), places=8)
+
     def test_compiled_replay_matches_fresh_compiled_run_for_exit_changes(self) -> None:
         df = self._sample_stream()
         rules_model = self._rules_model()

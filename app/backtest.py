@@ -329,11 +329,219 @@ def _entry_filter_range_atr(signal_bar: Optional[_EntryFilterBar]) -> Optional[f
     return bar_range / atr
 
 
+def _entry_filter_casebook_pullback_confirm_decision(
+    side: str,
+    cfg: EntryFilterConfig,
+    signal_bar: Optional[_EntryFilterBar],
+    confirm_bar: Optional[_EntryFilterBar],
+    setup_still_valid: bool,
+    *,
+    signal_row_index: Optional[int] = None,
+    confirm_row_index: Optional[int] = None,
+    stream_1m: Optional[pd.DataFrame] = None,
+) -> Tuple[str, str]:
+    cfg = (cfg or EntryFilterConfig()).normalized_copy()
+    if cfg.require_setup_still_valid and not bool(setup_still_valid):
+        return "BLOCK", "setup-invalid"
+    if str(side or "").upper().strip() != "LONG":
+        return "BLOCK", "unsupported-side"
+    if signal_bar is None or confirm_bar is None:
+        return "WAIT", "missing-bar"
+    if stream_1m is None or not isinstance(stream_1m, pd.DataFrame) or stream_1m.empty:
+        return "WAIT", "missing-stream"
+    if signal_row_index is None or confirm_row_index is None:
+        return "WAIT", "missing-row"
+
+    try:
+        signal_pos = int(signal_row_index)
+        confirm_pos = int(confirm_row_index)
+    except Exception:
+        return "WAIT", "missing-row"
+    if signal_pos < 0 or confirm_pos <= signal_pos or confirm_pos >= len(stream_1m):
+        return "WAIT", "await-pullback"
+
+    required_columns = {
+        "open",
+        "high",
+        "low",
+        "close",
+        "vidya_line",
+        "vidya_state",
+        "range_filter_state",
+        "range_filter_phase",
+        "range_filter_buy",
+        "range_filter_sell",
+        "vidya_trend_up",
+        "vidya_trend_down",
+    }
+    if any(col not in stream_1m.columns for col in required_columns):
+        return "BLOCK", "missing-fields"
+
+    def _truthy_event(value: Any) -> bool:
+        try:
+            if pd.isna(value):
+                return False
+        except Exception:
+            pass
+        try:
+            return bool(float(value))
+        except Exception:
+            raw = str(value or "").strip().upper()
+            return raw in {"1", "TRUE", "T", "YES", "Y", "EVENT"}
+
+    def _resolve_anchor_row_index() -> int:
+        lookback = max(2, int(cfg.casebook_anchor_lookback_bars))
+        start_pos = max(0, signal_pos - lookback)
+        reset_floor = start_pos
+        for pos in range(signal_pos, start_pos - 1, -1):
+            row = stream_1m.iloc[pos]
+            if pos < signal_pos and (
+                _truthy_event(row.get("range_filter_sell")) or _truthy_event(row.get("vidya_trend_down"))
+            ):
+                reset_floor = pos + 1
+                break
+        for pos in range(signal_pos, reset_floor - 1, -1):
+            row = stream_1m.iloc[pos]
+            if not _truthy_event(row.get("vidya_trend_up")):
+                continue
+            for rf_pos in range(pos, reset_floor - 1, -1):
+                if _truthy_event(stream_1m.iloc[rf_pos].get("range_filter_buy")):
+                    return pos
+        return signal_pos
+
+    anchor_pos = _resolve_anchor_row_index()
+    t0_row = stream_1m.iloc[anchor_pos]
+    t0_vidya = str(t0_row.get("vidya_state") or "").upper()
+    t0_rf = str(t0_row.get("range_filter_state") or "").upper()
+    if cfg.casebook_require_t0_vidya_buy and t0_vidya != "BUY":
+        return "BLOCK", "t0-vidya-not-buy"
+    if cfg.casebook_require_t0_rf_buy and t0_rf != "BUY":
+        return "BLOCK", "t0-rf-not-buy"
+
+    t0_close = _safe_float(t0_row.get("close"))
+    t0_open = _safe_float(t0_row.get("open"))
+    t0_high = _safe_float(t0_row.get("high"))
+    t0_low = _safe_float(t0_row.get("low"))
+    if t0_close is None or t0_open is None or t0_high is None or t0_low is None:
+        return "BLOCK", "missing-t0-price"
+    t0_body_bottom = min(float(t0_open), float(t0_close))
+    t0_full_range = max(1e-9, float(t0_high) - float(t0_low))
+
+    pullback_limit = min(len(stream_1m) - 1, anchor_pos + int(cfg.casebook_pullback_window_bars))
+    pullback_search_end = min(confirm_pos, pullback_limit)
+    if anchor_pos + 1 > pullback_search_end:
+        return "WAIT", "await-pullback"
+
+    pullback_slice = stream_1m.iloc[anchor_pos + 1 : pullback_search_end + 1]
+    lows = pd.to_numeric(pullback_slice["low"], errors="coerce").to_numpy(dtype=float)
+    if len(lows) == 0 or not np.isfinite(lows).any():
+        return "WAIT", "await-pullback"
+    pullback_pos = int(anchor_pos + 1 + int(np.nanargmin(lows)))
+    pullback_row = stream_1m.iloc[pullback_pos]
+    pullback_low = _safe_float(pullback_row.get("low"))
+    if pullback_low is None:
+        return "WAIT", "await-pullback"
+    if float(pullback_low) >= float(t0_body_bottom):
+        if confirm_pos >= pullback_limit:
+            return "BLOCK", "no-body-pierce"
+        return "WAIT", "await-body-pierce"
+    body_pierce_pct = ((float(t0_body_bottom) - float(pullback_low)) / float(t0_full_range)) * 100.0
+    if float(body_pierce_pct) < float(cfg.min_retrace_pct):
+        if confirm_pos >= pullback_limit:
+            return "BLOCK", f"body-pierce:{body_pierce_pct:.1f}%"
+        return "WAIT", f"await-deeper-pullback:{body_pierce_pct:.1f}%"
+
+    vidya_line = _safe_float(pullback_row.get("vidya_line"))
+    if vidya_line is None or float(pullback_low) < float(vidya_line):
+        return "BLOCK", "pullback-below-vidya"
+    vidya_gap_pct = ((float(pullback_low) - float(vidya_line)) / float(vidya_line)) * 100.0 if float(vidya_line) != 0.0 else None
+    if vidya_gap_pct is not None and float(vidya_gap_pct) > float(cfg.casebook_max_vidya_gap_pct):
+        return "BLOCK", f"vidya-gap:{vidya_gap_pct:.3f}%"
+
+    if cfg.casebook_require_vidya_buy_through_signal:
+        vidya_slice = stream_1m.iloc[anchor_pos : pullback_pos + 1]["vidya_state"].astype(str).str.upper()
+        if not vidya_slice.eq("BUY").all():
+            return "BLOCK", "vidya-lost-before-pullback"
+
+    pullback_phase = str(pullback_row.get("range_filter_phase") or "").upper()
+    delayed_rf_buy_phases = {str(part or "").upper().strip() for part in tuple(cfg.casebook_delayed_rf_buy_phases or ()) if str(part or "").strip()}
+    simple_reclaim_phases = {str(part or "").upper().strip() for part in tuple(cfg.casebook_simple_reclaim_phases or ()) if str(part or "").strip()}
+    min_signal_bars = max(0, int(cfg.casebook_min_signal_bars))
+    max_signal_bars = max(0, int(cfg.casebook_max_signal_bars))
+
+    def _signal_age_ok(pos: int) -> bool:
+        age = int(pos) - int(anchor_pos)
+        if min_signal_bars > 0 and age < min_signal_bars:
+            return False
+        if max_signal_bars > 0 and age > max_signal_bars:
+            return False
+        return True
+
+    if pullback_phase in delayed_rf_buy_phases:
+        if cfg.casebook_require_vidya_buy_through_signal:
+            vidya_slice = stream_1m.iloc[anchor_pos : confirm_pos + 1]["vidya_state"].astype(str).str.upper()
+            if not vidya_slice.eq("BUY").all():
+                return "BLOCK", "vidya-lost-before-signal"
+        if confirm_pos <= pullback_pos:
+            return "WAIT", "await-rf-buy"
+        max_signal_pos = (anchor_pos + max_signal_bars) if max_signal_bars > 0 else confirm_pos
+        search_end = min(confirm_pos, max_signal_pos)
+        for pos in range(pullback_pos + 1, search_end + 1):
+            row = stream_1m.iloc[pos]
+            if str(row.get("range_filter_state") or "").upper() != "BUY":
+                continue
+            if not _signal_age_ok(pos):
+                continue
+            return ("ALLOW", "casebook-rf-buy") if confirm_pos >= pos else ("WAIT", "await-rf-buy")
+        if max_signal_bars > 0 and confirm_pos >= int(anchor_pos + max_signal_bars):
+            return "BLOCK", "late-signal"
+        return "WAIT", "await-rf-buy"
+
+    if pullback_phase not in simple_reclaim_phases:
+        return "BLOCK", f"unsupported-phase:{pullback_phase or 'EMPTY'}"
+
+    reclaim_limit = min(len(stream_1m) - 1, pullback_pos + int(cfg.casebook_reclaim_window_bars))
+    reclaim_search_end = min(confirm_pos, reclaim_limit)
+    if pullback_pos + 1 > reclaim_search_end:
+        return "WAIT", "await-reclaim"
+
+    for pos in range(pullback_pos + 1, reclaim_search_end + 1):
+        if not _signal_age_ok(pos):
+            continue
+        row = stream_1m.iloc[pos]
+        close = _safe_float(row.get("close"))
+        open_ = _safe_float(row.get("open"))
+        prev_high = _safe_float(stream_1m.iloc[pos - 1].get("high")) if pos - 1 >= 0 else close
+        row_vidya_line = _safe_float(row.get("vidya_line"))
+        if close is None or open_ is None or prev_high is None:
+            continue
+        if close >= prev_high and close >= open_ and (row_vidya_line is None or close >= row_vidya_line):
+            if cfg.casebook_require_vidya_buy_through_signal:
+                vidya_slice = stream_1m.iloc[anchor_pos : pos + 1]["vidya_state"].astype(str).str.upper()
+                if not vidya_slice.eq("BUY").all():
+                    return "BLOCK", "vidya-lost-before-signal"
+            return ("ALLOW", "casebook-reclaim") if confirm_pos >= pos else ("WAIT", "await-reclaim")
+        if close >= float(t0_close) and close >= open_:
+            if cfg.casebook_require_vidya_buy_through_signal:
+                vidya_slice = stream_1m.iloc[anchor_pos : pos + 1]["vidya_state"].astype(str).str.upper()
+                if not vidya_slice.eq("BUY").all():
+                    return "BLOCK", "vidya-lost-before-signal"
+            return ("ALLOW", "casebook-close-reclaim") if confirm_pos >= pos else ("WAIT", "await-reclaim")
+
+    if max_signal_bars > 0 and confirm_pos >= int(anchor_pos + max_signal_bars):
+        return "BLOCK", "late-signal"
+    if confirm_pos >= reclaim_limit:
+        return "BLOCK", "no-reclaim"
+    return "WAIT", "await-reclaim"
+
+
 def _entry_filter_signal_decision(side: str, cfg: EntryFilterConfig, signal_bar: Optional[_EntryFilterBar]) -> Tuple[str, str]:
     cfg = (cfg or EntryFilterConfig()).normalized_copy()
     mode = cfg.normalized_mode()
     if not cfg.is_active() or mode == "OFF":
         return "ALLOW", "off"
+    if mode == "CASEBOOK_PULLBACK_V1":
+        return "WAIT", "await-casebook-pullback"
     if signal_bar is None:
         return "ALLOW", "missing-bar"
     _, _, reference_span = _entry_filter_reference_bounds(cfg, signal_bar)
@@ -364,13 +572,34 @@ def _entry_filter_signal_decision(side: str, cfg: EntryFilterConfig, signal_bar:
     return "ALLOW", "off"
 
 
-def _entry_filter_confirm_decision(side: str, cfg: EntryFilterConfig, signal_bar: Optional[_EntryFilterBar], confirm_bar: Optional[_EntryFilterBar], setup_still_valid: bool) -> Tuple[str, str]:
+def _entry_filter_confirm_decision(
+    side: str,
+    cfg: EntryFilterConfig,
+    signal_bar: Optional[_EntryFilterBar],
+    confirm_bar: Optional[_EntryFilterBar],
+    setup_still_valid: bool,
+    *,
+    signal_row_index: Optional[int] = None,
+    confirm_row_index: Optional[int] = None,
+    stream_1m: Optional[pd.DataFrame] = None,
+) -> Tuple[str, str]:
     cfg = (cfg or EntryFilterConfig()).normalized_copy()
     mode = cfg.normalized_mode()
     if not cfg.is_active() or mode == "OFF":
         return "ALLOW", "off"
     if cfg.require_setup_still_valid and not bool(setup_still_valid):
         return "BLOCK", "setup-invalid"
+    if mode == "CASEBOOK_PULLBACK_V1":
+        return _entry_filter_casebook_pullback_confirm_decision(
+            side,
+            cfg,
+            signal_bar,
+            confirm_bar,
+            setup_still_valid,
+            signal_row_index=signal_row_index,
+            confirm_row_index=confirm_row_index,
+            stream_1m=stream_1m,
+        )
     if signal_bar is None:
         return "ALLOW", "missing-bar"
     if confirm_bar is None:
@@ -443,6 +672,9 @@ def _combine_entry_filter_confirm_decisions(
     confirm_bar: Optional[_EntryFilterBar],
     setup_still_valid: bool,
     bars_since_signal: int = 1,
+    signal_row_index: Optional[int] = None,
+    confirm_row_index: Optional[int] = None,
+    stream_1m: Optional[pd.DataFrame] = None,
 ) -> Tuple[str, str]:
     active_cfgs = [cfg.normalized_copy() for cfg in (cfgs or []) if isinstance(cfg, EntryFilterConfig) and cfg.is_active()]
     if not active_cfgs:
@@ -460,8 +692,17 @@ def _combine_entry_filter_confirm_decisions(
         if mode == "ANTI_CHASE" and age < int(cfg.confirm_bars):
             wait_details.append(f"await:{age}/{int(cfg.confirm_bars)}")
             continue
-        decision, detail = _entry_filter_confirm_decision(side, cfg, signal_bar, confirm_bar, setup_still_valid)
-        if decision == "WAIT" and age >= int(cfg.confirm_bars):
+        decision, detail = _entry_filter_confirm_decision(
+            side,
+            cfg,
+            signal_bar,
+            confirm_bar,
+            setup_still_valid,
+            signal_row_index=signal_row_index,
+            confirm_row_index=confirm_row_index,
+            stream_1m=stream_1m,
+        )
+        if decision == "WAIT" and mode != "CASEBOOK_PULLBACK_V1" and age >= int(cfg.confirm_bars):
             decision, detail = "BLOCK", f"timeout:{age}"
         if decision == "BLOCK":
             blocked_details.append(str(detail))
@@ -1800,6 +2041,9 @@ def _run_backtest_from_frozen_inputs(symbol: str,
                         _bar_for_time(t),
                         setup_still_valid,
                         bars_since_signal=bars_since_signal,
+                        signal_row_index=getattr(p, "signal_snapshot_row_index", None),
+                        confirm_row_index=j,
+                        stream_1m=subs.get("1m"),
                     )
                     if confirm_decision == "ALLOW":
                         pending[s] = None
@@ -3190,6 +3434,9 @@ def run_backtest_tick(symbol: str,
                                 _bar_for_decision(int(next_sig_ms)),
                                 setup_still_valid,
                                 bars_since_signal=bars_since_signal,
+                                signal_row_index=getattr(p, "signal_snapshot_row_index", None),
+                                confirm_row_index=j,
+                                stream_1m=subs.get("1m"),
                             )
                             if decision == "ALLOW":
                                 pending[s] = None

@@ -1544,6 +1544,9 @@ def run_backtest_compiled_plan(
                             _bar_info_at(step_bars, bar_time),
                             setup_still_valid,
                             bars_since_signal=bars_since_signal,
+                            signal_row_index=getattr(pending_entry, "signal_snapshot_row_index", None),
+                            confirm_row_index=j,
+                            stream_1m=plan.df_1m,
                         )
                         if confirm_decision == "ALLOW":
                             pending[side] = None

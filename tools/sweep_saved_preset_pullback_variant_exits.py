@@ -23,7 +23,6 @@ from app.data_binance import binance_fapi_server_time_utc
 from app.fast_backtest import run_backtest_auto
 from app.research.replay import extract_backtest_replay_context, replay_backtest_result
 from app.stream_bundle_loader import load_stream_bundle_library_first
-from app.strategy_compiler import FAST_BAR_ENGINE
 from app.strategy_requirements import compile_stream_requirements
 from app.utils_time import parse_utc, required_warmup_minutes
 from tools.run_saved_preset import (
@@ -50,7 +49,6 @@ from tools.sweep_saved_preset_pullback_variants import (
 from tools._replay_worker_pool import (
     choose_auto_chunk_size,
     choose_auto_workers,
-    compact_compiled_worker_replay_context,
     detect_cpu_counts,
     get_worker_base_cfg,
     get_worker_replay_source,
@@ -277,11 +275,10 @@ def _run_replay_grid(
             raise ValueError("Base backtest result is missing replay_context, so parallel replay is unavailable.")
         temp_dir_ctx = tempfile.TemporaryDirectory(prefix="variant_exit_replay_ctx_")
         replay_blob_path = Path(temp_dir_ctx.name) / "replay_context.pkl"
-        replay_context_for_workers = (
-            compact_compiled_worker_replay_context(replay_context)
-            if str(replay_context.get("__replay_engine") or "") == FAST_BAR_ENGINE
-            else replay_context
-        )
+        # Keep the full compiled replay context for worker replays. Some compiled
+        # paths now require the original CompiledBarPlan for correctness, and the
+        # compact replay-only plan is no longer sufficient for exit sweeps.
+        replay_context_for_workers = replay_context
         replay_blob_size = write_worker_replay_source(replay_blob_path, replay_context_for_workers)
         bootstrap_blob_mib = float(replay_blob_size / (1024 * 1024))
         if show_bootstrap_details:

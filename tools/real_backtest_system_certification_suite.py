@@ -193,6 +193,25 @@ def _trade_parity_case(*, python_exe: str, output_dir: Path) -> Dict[str, Any]:
     )
 
 
+def _causality_case(*, python_exe: str, output_dir: Path) -> Dict[str, Any]:
+    case_dir = output_dir / "causality_suite"
+    run = _run_command(
+        label="causality_suite",
+        command=[
+            python_exe,
+            str(REPO_ROOT / "tools" / "real_backtest_causality_suite.py"),
+            "--output-dir",
+            str(case_dir),
+        ],
+        workdir=REPO_ROOT,
+    )
+    return _summary_layer(
+        label="causality_suite",
+        run=run,
+        summary_path=case_dir / "summary.json",
+    )
+
+
 def _replay_context_safety_case(*, python_exe: str, output_dir: Path) -> Dict[str, Any]:
     case_dir = output_dir / "replay_context_safety"
     run = _run_command(
@@ -330,6 +349,7 @@ def main() -> int:
         _range_filter_oracle_case(python_exe=str(args.python_exe), output_dir=output_dir),
         _backtest_parity_case(python_exe=str(args.python_exe), output_dir=output_dir),
         _trade_parity_case(python_exe=str(args.python_exe), output_dir=output_dir),
+        _causality_case(python_exe=str(args.python_exe), output_dir=output_dir),
         _replay_context_safety_case(python_exe=str(args.python_exe), output_dir=output_dir),
         _runtime_regression_case(python_exe=str(args.python_exe), output_dir=output_dir),
         _pytest_contract_case(

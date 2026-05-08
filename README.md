@@ -119,6 +119,18 @@ Run default pytest suite:
 python -m pytest
 ```
 
+Run the full technical backtest certification ladder:
+
+```bash
+python tools/real_backtest_system_certification_suite.py
+```
+
+Run the prefix-causality invariance check only:
+
+```bash
+python tools/real_backtest_causality_suite.py
+```
+
 Run the hardened smoke path:
 
 ```bash
@@ -137,3 +149,24 @@ Audit and organize the local cache library:
 ```bash
 python scripts/manual/organize_cache_library.py --cache-dir data_cache
 ```
+
+## Backtest status
+
+The backtest engine now has a separate technical certification ladder. This is different from strategy or casebook exactness.
+
+Technical certification currently covers:
+- independent `Range Filter` oracle parity
+- backtest parity on fixed control windows
+- trade-by-trade parity on fixed control windows
+- prefix-causality invariance
+- replay-context safety
+- runtime regression
+- live/downloader contract tests
+
+If `python tools/real_backtest_system_certification_suite.py` passes, the engine itself is considered technically healthy.
+
+Casebook or preset exactness is a higher semantic layer. If a strategy family still does not hit a research case exactly, that is treated as a strategy-semantics problem unless the technical certification ladder fails.
+
+More detail:
+
+[docs/BACKTEST_CERTIFICATION.md](docs/BACKTEST_CERTIFICATION.md)

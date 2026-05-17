@@ -43,6 +43,9 @@ class ReentrySpec:
     require_stoch_confirm: bool = False
     stoch_entry_ceiling_long: float = 60.0
     stoch_entry_floor_short: float = 40.0
+    require_micro_reclaim: bool = False
+    micro_reclaim_min_bars: int = 2
+    micro_reclaim_lookback: int = 3
 
 
 def _equity_metrics(equity: List[float]) -> Dict[str, Any]:
@@ -98,6 +101,7 @@ def _initial_context(side: str, row: pd.Series) -> Dict[str, Any]:
         "stoch_extreme_seen": False,
         "last_touch_idx": None,
         "entry_candidate_idx": None,
+        "reclaim_ref": None,
     }
 
 
@@ -124,6 +128,8 @@ def _update_context(ctx: Dict[str, Any], row: pd.Series, spec: ReentrySpec) -> N
         if float(row["low"]) <= atr_ts + (spec.pullback_touch_atr * atr):
             ctx["touch_seen"] = True
             ctx["last_touch_idx"] = int(row.name)
+            if ctx.get("reclaim_ref") is None:
+                ctx["reclaim_ref"] = float(row["high"])
         ready = ctx["touch_seen"]
         if spec.require_counter_event:
             ready = ready and bool(ctx["counter_seen"])
@@ -139,7 +145,16 @@ def _update_context(ctx: Dict[str, Any], row: pd.Series, spec: ReentrySpec) -> N
                 and (stoch_k > stoch_d)
                 and (stoch_k <= float(spec.stoch_entry_ceiling_long))
             )
-        if ready and rf_buy and float(row["close"]) > atr_ts and stoch_ok:
+        reclaim_ok = True
+        if spec.require_micro_reclaim:
+            reclaim_ok = False
+            touch_idx = ctx.get("last_touch_idx")
+            if touch_idx is not None:
+                bars_since_touch = int(row.name) - int(touch_idx)
+                if bars_since_touch >= int(spec.micro_reclaim_min_bars):
+                    reclaim_ok = float(row["close"]) > float(ctx["reclaim_ref"])
+                ctx["reclaim_ref"] = max(float(ctx["reclaim_ref"]), float(row["high"]))
+        if ready and rf_buy and float(row["close"]) > atr_ts and stoch_ok and reclaim_ok:
             ctx["entry_candidate_idx"] = int(row.name)
     else:
         if rf_buy:
@@ -151,6 +166,8 @@ def _update_context(ctx: Dict[str, Any], row: pd.Series, spec: ReentrySpec) -> N
         if float(row["high"]) >= atr_ts - (spec.pullback_touch_atr * atr):
             ctx["touch_seen"] = True
             ctx["last_touch_idx"] = int(row.name)
+            if ctx.get("reclaim_ref") is None:
+                ctx["reclaim_ref"] = float(row["low"])
         ready = ctx["touch_seen"]
         if spec.require_counter_event:
             ready = ready and bool(ctx["counter_seen"])
@@ -166,7 +183,16 @@ def _update_context(ctx: Dict[str, Any], row: pd.Series, spec: ReentrySpec) -> N
                 and (stoch_k < stoch_d)
                 and (stoch_k >= float(spec.stoch_entry_floor_short))
             )
-        if ready and rf_sell and float(row["close"]) < atr_ts and stoch_ok:
+        reclaim_ok = True
+        if spec.require_micro_reclaim:
+            reclaim_ok = False
+            touch_idx = ctx.get("last_touch_idx")
+            if touch_idx is not None:
+                bars_since_touch = int(row.name) - int(touch_idx)
+                if bars_since_touch >= int(spec.micro_reclaim_min_bars):
+                    reclaim_ok = float(row["close"]) < float(ctx["reclaim_ref"])
+                ctx["reclaim_ref"] = min(float(ctx["reclaim_ref"]), float(row["low"]))
+        if ready and rf_sell and float(row["close"]) < atr_ts and stoch_ok and reclaim_ok:
             ctx["entry_candidate_idx"] = int(row.name)
 
 
@@ -424,6 +450,22 @@ def main() -> int:
             require_stoch_confirm=True,
             stoch_entry_ceiling_long=60.0,
             stoch_entry_floor_short=40.0,
+        ),
+        ReentrySpec(
+            name="ms_rf_reset_neutral_stoch_confirm_reclaim_trail",
+            max_bars_after_choch=60,
+            pullback_touch_atr=0.20,
+            stop_buffer_atr=0.12,
+            require_counter_event=True,
+            require_neutral=True,
+            use_target1=False,
+            use_trailing_stop=True,
+            require_stoch_confirm=True,
+            stoch_entry_ceiling_long=60.0,
+            stoch_entry_floor_short=40.0,
+            require_micro_reclaim=True,
+            micro_reclaim_min_bars=2,
+            micro_reclaim_lookback=3,
         ),
         ReentrySpec(
             name="ms_rf_reset_neutral_stoch_extreme_trail",

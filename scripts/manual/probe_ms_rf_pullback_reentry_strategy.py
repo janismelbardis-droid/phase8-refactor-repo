@@ -15,7 +15,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from app.indicators_streaming import compute_range_filter_series
+from app.indicators_streaming import compute_range_filter_series, stoch_rsi_series
 from scripts.manual.probe_ms_trend_matrix_strategy import (
     DEFAULT_OUTPUT_ROOT,
     _compute_ms_trend_matrix_frame,
@@ -37,6 +37,12 @@ class ReentrySpec:
     require_neutral: bool
     use_target1: bool
     use_trailing_stop: bool
+    require_stoch_extreme: bool = False
+    stoch_oversold: float = 20.0
+    stoch_overbought: float = 80.0
+    require_stoch_confirm: bool = False
+    stoch_entry_ceiling_long: float = 60.0
+    stoch_entry_floor_short: float = 40.0
 
 
 def _equity_metrics(equity: List[float]) -> Dict[str, Any]:
@@ -70,6 +76,14 @@ def _prepare_frame(
     rf = compute_range_filter_series(frame["close"].to_numpy(dtype=float))
     for key, values in rf.items():
         frame[key] = values
+    _rsi, stoch_k, stoch_d = stoch_rsi_series(frame["close"].to_numpy(dtype=float))
+    frame["stoch_rsi_k"] = stoch_k
+    frame["stoch_rsi_d"] = stoch_d
+    frame["stoch_rsi_kd"] = np.where(
+        np.isfinite(stoch_k) & np.isfinite(stoch_d),
+        np.where(stoch_k > stoch_d, "GREEN", "RED"),
+        None,
+    )
     return frame
 
 
@@ -81,6 +95,7 @@ def _initial_context(side: str, row: pd.Series) -> Dict[str, Any]:
         "counter_seen": False,
         "neutral_seen": False,
         "touch_seen": False,
+        "stoch_extreme_seen": False,
         "last_touch_idx": None,
         "entry_candidate_idx": None,
     }
@@ -96,12 +111,16 @@ def _update_context(ctx: Dict[str, Any], row: pd.Series, spec: ReentrySpec) -> N
     rf_state = str(row.get("range_filter_state") or "").upper()
     rf_buy = bool(row.get("range_filter_buy"))
     rf_sell = bool(row.get("range_filter_sell"))
+    stoch_k = float(row.get("stoch_rsi_k")) if pd.notna(row.get("stoch_rsi_k")) else np.nan
+    stoch_d = float(row.get("stoch_rsi_d")) if pd.notna(row.get("stoch_rsi_d")) else np.nan
 
     if side == "LONG":
         if rf_sell:
             ctx["counter_seen"] = True
         if rf_state == "NEUTRAL":
             ctx["neutral_seen"] = True
+        if np.isfinite(stoch_k) and stoch_k <= float(spec.stoch_oversold):
+            ctx["stoch_extreme_seen"] = True
         if float(row["low"]) <= atr_ts + (spec.pullback_touch_atr * atr):
             ctx["touch_seen"] = True
             ctx["last_touch_idx"] = int(row.name)
@@ -110,13 +129,25 @@ def _update_context(ctx: Dict[str, Any], row: pd.Series, spec: ReentrySpec) -> N
             ready = ready and bool(ctx["counter_seen"])
         if spec.require_neutral:
             ready = ready and bool(ctx["neutral_seen"])
-        if ready and rf_buy and float(row["close"]) > atr_ts:
+        if spec.require_stoch_extreme:
+            ready = ready and bool(ctx["stoch_extreme_seen"])
+        stoch_ok = True
+        if spec.require_stoch_confirm:
+            stoch_ok = (
+                np.isfinite(stoch_k)
+                and np.isfinite(stoch_d)
+                and (stoch_k > stoch_d)
+                and (stoch_k <= float(spec.stoch_entry_ceiling_long))
+            )
+        if ready and rf_buy and float(row["close"]) > atr_ts and stoch_ok:
             ctx["entry_candidate_idx"] = int(row.name)
     else:
         if rf_buy:
             ctx["counter_seen"] = True
         if rf_state == "NEUTRAL":
             ctx["neutral_seen"] = True
+        if np.isfinite(stoch_k) and stoch_k >= float(spec.stoch_overbought):
+            ctx["stoch_extreme_seen"] = True
         if float(row["high"]) >= atr_ts - (spec.pullback_touch_atr * atr):
             ctx["touch_seen"] = True
             ctx["last_touch_idx"] = int(row.name)
@@ -125,7 +156,17 @@ def _update_context(ctx: Dict[str, Any], row: pd.Series, spec: ReentrySpec) -> N
             ready = ready and bool(ctx["counter_seen"])
         if spec.require_neutral:
             ready = ready and bool(ctx["neutral_seen"])
-        if ready and rf_sell and float(row["close"]) < atr_ts:
+        if spec.require_stoch_extreme:
+            ready = ready and bool(ctx["stoch_extreme_seen"])
+        stoch_ok = True
+        if spec.require_stoch_confirm:
+            stoch_ok = (
+                np.isfinite(stoch_k)
+                and np.isfinite(stoch_d)
+                and (stoch_k < stoch_d)
+                and (stoch_k >= float(spec.stoch_entry_floor_short))
+            )
+        if ready and rf_sell and float(row["close"]) < atr_ts and stoch_ok:
             ctx["entry_candidate_idx"] = int(row.name)
 
 
@@ -268,6 +309,7 @@ def _run_strategy(frame: pd.DataFrame, spec: ReentrySpec) -> Dict[str, Any]:
                                 "counter_seen": bool(context["counter_seen"]),
                                 "neutral_seen": bool(context["neutral_seen"]),
                                 "touch_seen": bool(context["touch_seen"]),
+                                "stoch_extreme_seen": bool(context["stoch_extreme_seen"]),
                             }
                         )
                     context = None
@@ -369,6 +411,35 @@ def main() -> int:
             require_neutral=True,
             use_target1=False,
             use_trailing_stop=True,
+        ),
+        ReentrySpec(
+            name="ms_rf_reset_neutral_stoch_confirm_trail",
+            max_bars_after_choch=60,
+            pullback_touch_atr=0.20,
+            stop_buffer_atr=0.12,
+            require_counter_event=True,
+            require_neutral=True,
+            use_target1=False,
+            use_trailing_stop=True,
+            require_stoch_confirm=True,
+            stoch_entry_ceiling_long=60.0,
+            stoch_entry_floor_short=40.0,
+        ),
+        ReentrySpec(
+            name="ms_rf_reset_neutral_stoch_extreme_trail",
+            max_bars_after_choch=60,
+            pullback_touch_atr=0.20,
+            stop_buffer_atr=0.12,
+            require_counter_event=True,
+            require_neutral=True,
+            use_target1=False,
+            use_trailing_stop=True,
+            require_stoch_extreme=True,
+            require_stoch_confirm=True,
+            stoch_oversold=20.0,
+            stoch_overbought=80.0,
+            stoch_entry_ceiling_long=65.0,
+            stoch_entry_floor_short=35.0,
         ),
         ReentrySpec(
             name="ms_rf_reset_neutral_target1",

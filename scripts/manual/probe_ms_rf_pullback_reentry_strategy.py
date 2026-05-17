@@ -46,6 +46,8 @@ class ReentrySpec:
     require_micro_reclaim: bool = False
     micro_reclaim_min_bars: int = 2
     micro_reclaim_lookback: int = 3
+    allowed_start_hour_utc: Optional[int] = None
+    allowed_end_hour_utc: Optional[int] = None
 
 
 def _equity_metrics(equity: List[float]) -> Dict[str, Any]:
@@ -59,6 +61,17 @@ def _equity_metrics(equity: List[float]) -> Dict[str, Any]:
             dd_pct = ((peak - float(value)) / peak) * 100.0
             max_dd_pct = max(max_dd_pct, dd_pct)
     return {"max_drawdown_pct": float(max_dd_pct)}
+
+
+def _hour_allowed(ts: pd.Timestamp, spec: ReentrySpec) -> bool:
+    start = spec.allowed_start_hour_utc
+    end = spec.allowed_end_hour_utc
+    if start is None or end is None:
+        return True
+    hour = int(pd.Timestamp(ts).tz_convert("UTC").hour if pd.Timestamp(ts).tzinfo else pd.Timestamp(ts, tz="UTC").hour)
+    if start < end:
+        return start <= hour < end
+    return hour >= start or hour < end
 
 
 def _prepare_frame(
@@ -310,7 +323,7 @@ def _run_strategy(frame: pd.DataFrame, spec: ReentrySpec) -> Dict[str, Any]:
                     context = None
             else:
                 _update_context(context, row, spec)
-                if context.get("entry_candidate_idx") == int(row.name):
+                if context.get("entry_candidate_idx") == int(row.name) and _hour_allowed(ts, spec):
                     entry_bar_idx = i + 1
                     if entry_bar_idx < len(frame) and np.isfinite(float(row["ms_atr_ts"])) and np.isfinite(float(row["atr"])):
                         if str(context["side"]) == "LONG":
@@ -450,6 +463,51 @@ def main() -> int:
             require_stoch_confirm=True,
             stoch_entry_ceiling_long=60.0,
             stoch_entry_floor_short=40.0,
+        ),
+        ReentrySpec(
+            name="ms_rf_stoch_confirm_london",
+            max_bars_after_choch=60,
+            pullback_touch_atr=0.20,
+            stop_buffer_atr=0.12,
+            require_counter_event=True,
+            require_neutral=True,
+            use_target1=False,
+            use_trailing_stop=True,
+            require_stoch_confirm=True,
+            stoch_entry_ceiling_long=60.0,
+            stoch_entry_floor_short=40.0,
+            allowed_start_hour_utc=6,
+            allowed_end_hour_utc=11,
+        ),
+        ReentrySpec(
+            name="ms_rf_stoch_confirm_overlap",
+            max_bars_after_choch=60,
+            pullback_touch_atr=0.20,
+            stop_buffer_atr=0.12,
+            require_counter_event=True,
+            require_neutral=True,
+            use_target1=False,
+            use_trailing_stop=True,
+            require_stoch_confirm=True,
+            stoch_entry_ceiling_long=60.0,
+            stoch_entry_floor_short=40.0,
+            allowed_start_hour_utc=11,
+            allowed_end_hour_utc=16,
+        ),
+        ReentrySpec(
+            name="ms_rf_stoch_confirm_asia",
+            max_bars_after_choch=60,
+            pullback_touch_atr=0.20,
+            stop_buffer_atr=0.12,
+            require_counter_event=True,
+            require_neutral=True,
+            use_target1=False,
+            use_trailing_stop=True,
+            require_stoch_confirm=True,
+            stoch_entry_ceiling_long=60.0,
+            stoch_entry_floor_short=40.0,
+            allowed_start_hour_utc=0,
+            allowed_end_hour_utc=6,
         ),
         ReentrySpec(
             name="ms_rf_reset_neutral_stoch_confirm_reclaim_trail",

@@ -222,6 +222,15 @@ def _build_payload(candidates: pd.DataFrame, *, symbol: str, warmup_start: pd.Ti
         _summary_block("all_candidates", candidates),
         _summary_block("ms_align", candidates[candidates["ms_align"]]),
         _summary_block(
+            "long_support_reclaim_ms_align",
+            candidates[
+                (candidates["side"] == "LONG")
+                & (candidates["ms_align"])
+                & (candidates["entry_vs_prev_low_pct"] > 0.0)
+                & (candidates["entry_vs_prev_mid_pct"] < 0.0)
+            ],
+        ),
+        _summary_block(
             "short_below_prev_low_ms_align",
             candidates[(candidates["side"] == "SHORT") & (candidates["ms_align"]) & (candidates["entry_vs_prev_low_pct"] < 0.0)],
         ),
@@ -285,6 +294,7 @@ def _render_report(payload: dict[str, Any]) -> str:
     lines.append("- Candidates are `Range Filter BUY/SELL` events that occur only after an immediate `NEUTRAL` reset and only when `VIDYA` agrees with the direction.")
     lines.append("- `ms_align` means the BigBeluga-style market structure direction does not veto the trade.")
     lines.append("- `prev_day_*` levels are previous New York day levels.")
+    lines.append("- `long_support_reclaim_ms_align` means the long candidate reclaimed from above previous NY low but was still below previous NY midpoint on entry.")
     lines.append("- `mfe_180_R` / `mae_180_R` are forward 180-minute excursion metrics in units of the candidate stop-risk.")
     return "\n".join(lines) + "\n"
 

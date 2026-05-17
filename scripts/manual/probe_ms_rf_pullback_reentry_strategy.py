@@ -48,6 +48,12 @@ class ReentrySpec:
     micro_reclaim_lookback: int = 3
     allowed_start_hour_utc: Optional[int] = None
     allowed_end_hour_utc: Optional[int] = None
+    require_confirmation_bar: bool = False
+    require_neutral_then_confirm: bool = False
+    stoch_veto_only: bool = False
+    stoch_veto_long_max: float = 80.0
+    stoch_veto_short_min: float = 20.0
+    break_even_r: Optional[float] = None
 
 
 def _equity_metrics(equity: List[float]) -> Dict[str, Any]:
@@ -115,6 +121,10 @@ def _initial_context(side: str, row: pd.Series) -> Dict[str, Any]:
         "last_touch_idx": None,
         "entry_candidate_idx": None,
         "reclaim_ref": None,
+        "neutral_idx": None,
+        "confirm_ref_high": None,
+        "confirm_ref_low": None,
+        "break_even_armed": False,
     }
 
 
@@ -136,6 +146,7 @@ def _update_context(ctx: Dict[str, Any], row: pd.Series, spec: ReentrySpec) -> N
             ctx["counter_seen"] = True
         if rf_state == "NEUTRAL":
             ctx["neutral_seen"] = True
+            ctx["neutral_idx"] = int(row.name)
         if np.isfinite(stoch_k) and stoch_k <= float(spec.stoch_oversold):
             ctx["stoch_extreme_seen"] = True
         if float(row["low"]) <= atr_ts + (spec.pullback_touch_atr * atr):
@@ -151,7 +162,9 @@ def _update_context(ctx: Dict[str, Any], row: pd.Series, spec: ReentrySpec) -> N
         if spec.require_stoch_extreme:
             ready = ready and bool(ctx["stoch_extreme_seen"])
         stoch_ok = True
-        if spec.require_stoch_confirm:
+        if spec.stoch_veto_only:
+            stoch_ok = np.isfinite(stoch_k) and (stoch_k <= float(spec.stoch_veto_long_max))
+        elif spec.require_stoch_confirm:
             stoch_ok = (
                 np.isfinite(stoch_k)
                 and np.isfinite(stoch_d)
@@ -167,13 +180,24 @@ def _update_context(ctx: Dict[str, Any], row: pd.Series, spec: ReentrySpec) -> N
                 if bars_since_touch >= int(spec.micro_reclaim_min_bars):
                     reclaim_ok = float(row["close"]) > float(ctx["reclaim_ref"])
                 ctx["reclaim_ref"] = max(float(ctx["reclaim_ref"]), float(row["high"]))
-        if ready and rf_buy and float(row["close"]) > atr_ts and stoch_ok and reclaim_ok:
-            ctx["entry_candidate_idx"] = int(row.name)
+        neutral_order_ok = True
+        if spec.require_neutral_then_confirm:
+            neutral_order_ok = ctx["neutral_idx"] is not None and int(ctx["neutral_idx"]) < int(row.name)
+        if ready and rf_buy and float(row["close"]) > atr_ts and stoch_ok and reclaim_ok and neutral_order_ok:
+            if spec.require_confirmation_bar:
+                if ctx["confirm_ref_high"] is None:
+                    ctx["confirm_ref_high"] = float(row["high"])
+            else:
+                ctx["entry_candidate_idx"] = int(row.name)
+        elif spec.require_confirmation_bar and ctx["confirm_ref_high"] is not None:
+            if float(row["close"]) > float(ctx["confirm_ref_high"]) and float(row["close"]) > atr_ts and stoch_ok and reclaim_ok:
+                ctx["entry_candidate_idx"] = int(row.name)
     else:
         if rf_buy:
             ctx["counter_seen"] = True
         if rf_state == "NEUTRAL":
             ctx["neutral_seen"] = True
+            ctx["neutral_idx"] = int(row.name)
         if np.isfinite(stoch_k) and stoch_k >= float(spec.stoch_overbought):
             ctx["stoch_extreme_seen"] = True
         if float(row["high"]) >= atr_ts - (spec.pullback_touch_atr * atr):
@@ -189,7 +213,9 @@ def _update_context(ctx: Dict[str, Any], row: pd.Series, spec: ReentrySpec) -> N
         if spec.require_stoch_extreme:
             ready = ready and bool(ctx["stoch_extreme_seen"])
         stoch_ok = True
-        if spec.require_stoch_confirm:
+        if spec.stoch_veto_only:
+            stoch_ok = np.isfinite(stoch_k) and (stoch_k >= float(spec.stoch_veto_short_min))
+        elif spec.require_stoch_confirm:
             stoch_ok = (
                 np.isfinite(stoch_k)
                 and np.isfinite(stoch_d)
@@ -205,8 +231,18 @@ def _update_context(ctx: Dict[str, Any], row: pd.Series, spec: ReentrySpec) -> N
                 if bars_since_touch >= int(spec.micro_reclaim_min_bars):
                     reclaim_ok = float(row["close"]) < float(ctx["reclaim_ref"])
                 ctx["reclaim_ref"] = min(float(ctx["reclaim_ref"]), float(row["low"]))
-        if ready and rf_sell and float(row["close"]) < atr_ts and stoch_ok and reclaim_ok:
-            ctx["entry_candidate_idx"] = int(row.name)
+        neutral_order_ok = True
+        if spec.require_neutral_then_confirm:
+            neutral_order_ok = ctx["neutral_idx"] is not None and int(ctx["neutral_idx"]) < int(row.name)
+        if ready and rf_sell and float(row["close"]) < atr_ts and stoch_ok and reclaim_ok and neutral_order_ok:
+            if spec.require_confirmation_bar:
+                if ctx["confirm_ref_low"] is None:
+                    ctx["confirm_ref_low"] = float(row["low"])
+            else:
+                ctx["entry_candidate_idx"] = int(row.name)
+        elif spec.require_confirmation_bar and ctx["confirm_ref_low"] is not None:
+            if float(row["close"]) < float(ctx["confirm_ref_low"]) and float(row["close"]) < atr_ts and stoch_ok and reclaim_ok:
+                ctx["entry_candidate_idx"] = int(row.name)
 
 
 def _run_strategy(frame: pd.DataFrame, spec: ReentrySpec) -> Dict[str, Any]:
@@ -241,9 +277,11 @@ def _run_strategy(frame: pd.DataFrame, spec: ReentrySpec) -> Dict[str, Any]:
                 "entry_price": float(entry_price),
                 "qty": float(qty),
                 "stop": float(pending_entry["stop"]),
+                "initial_stop": float(pending_entry["stop"]),
                 "target": float(pending_entry["target"]) if pending_entry["target"] is not None else np.nan,
                 "signal_ts": pending_entry["signal_ts"],
                 "signal_type": pending_entry["signal_type"],
+                "break_even_armed": False,
             }
             pending_entry = None
 
@@ -253,6 +291,23 @@ def _run_strategy(frame: pd.DataFrame, spec: ReentrySpec) -> Dict[str, Any]:
             target_price = float(position["target"]) if np.isfinite(float(position["target"])) else np.nan
             exit_reason = None
             exit_price = np.nan
+
+            if spec.break_even_r is not None:
+                initial_stop = float(position["initial_stop"])
+                entry_price = float(position["entry_price"])
+                initial_r = abs(entry_price - initial_stop)
+                if initial_r > 0 and not bool(position.get("break_even_armed", False)):
+                    if side == "LONG":
+                        be_trigger = entry_price + initial_r * float(spec.break_even_r)
+                        if float(row["high"]) >= be_trigger:
+                            position["stop"] = max(float(position["stop"]), entry_price)
+                            position["break_even_armed"] = True
+                    else:
+                        be_trigger = entry_price - initial_r * float(spec.break_even_r)
+                        if float(row["low"]) <= be_trigger:
+                            position["stop"] = min(float(position["stop"]), entry_price)
+                            position["break_even_armed"] = True
+                    stop_price = float(position["stop"])
 
             if spec.use_trailing_stop and np.isfinite(float(row["ms_atr_ts"])):
                 if side == "LONG":
@@ -506,6 +561,24 @@ def main() -> int:
             require_stoch_confirm=True,
             stoch_entry_ceiling_long=60.0,
             stoch_entry_floor_short=40.0,
+            allowed_start_hour_utc=11,
+            allowed_end_hour_utc=16,
+        ),
+        ReentrySpec(
+            name="ms_rf_veto_confirm_be_overlap_early25",
+            max_bars_after_choch=25,
+            pullback_touch_atr=0.20,
+            stop_buffer_atr=0.12,
+            require_counter_event=True,
+            require_neutral=True,
+            use_target1=False,
+            use_trailing_stop=True,
+            stoch_veto_only=True,
+            stoch_veto_long_max=70.0,
+            stoch_veto_short_min=30.0,
+            require_confirmation_bar=True,
+            require_neutral_then_confirm=True,
+            break_even_r=1.0,
             allowed_start_hour_utc=11,
             allowed_end_hour_utc=16,
         ),

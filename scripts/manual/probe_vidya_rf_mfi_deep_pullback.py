@@ -55,6 +55,9 @@ class Variant:
     take_profit_r: Optional[float] = None
     partial_tp_fraction: float = 1.0
     max_hold_bars: int = 240
+    min_entry_vs_prev_low_pct: Optional[float] = None
+    max_signal_upper_wick_pct_range: Optional[float] = None
+    min_dist_above_swing_low_atr: Optional[float] = None
 
 
 def _load_local_1m(start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame:
@@ -167,6 +170,25 @@ def _prepare_frame(raw: pd.DataFrame) -> pd.DataFrame:
 
     frame["ctx5_open"] = (frame["ts"] + pd.Timedelta(minutes=1)).dt.floor("5min") - pd.Timedelta(minutes=5)
     frame = frame.merge(frame_5m[["ctx5_open", "ctx5_vidya_state", "ctx5_range_state", "ctx5_range_phase"]], on="ctx5_open", how="left")
+
+    ny = frame["ts"].dt.tz_convert("America/New_York")
+    frame["ny_day"] = ny.dt.floor("D")
+    daily = frame.groupby("ny_day").agg(day_high=("high", "max"), day_low=("low", "min")).sort_index()
+    daily["prev_day_high"] = daily["day_high"].shift(1)
+    daily["prev_day_low"] = daily["day_low"].shift(1)
+    frame = frame.merge(daily[["prev_day_high", "prev_day_low"]], left_on="ny_day", right_index=True, how="left")
+    frame["prev_day_mid"] = (frame["prev_day_high"] + frame["prev_day_low"]) / 2.0
+
+    candle_range = (frame["high"] - frame["low"]).replace(0.0, np.nan)
+    frame["body_abs"] = (frame["close"] - frame["open"]).abs()
+    frame["upper_wick"] = frame["high"] - frame[["open", "close"]].max(axis=1)
+    frame["lower_wick"] = frame[["open", "close"]].min(axis=1) - frame["low"]
+    frame["body_pct_range"] = frame["body_abs"] / candle_range
+    frame["upper_wick_pct_range"] = frame["upper_wick"] / candle_range
+    frame["lower_wick_pct_range"] = frame["lower_wick"] / candle_range
+
+    prior_swing_low = frame["low"].rolling(20, min_periods=5).min().shift(1)
+    frame["dist_above_swing_low_atr"] = (frame["open"] - prior_swing_low) / frame["atr14"]
     return frame
 
 
@@ -329,6 +351,24 @@ def _build_candidates(frame: pd.DataFrame, variant: Variant, analysis_start: pd.
             if entry_gap_atr < -0.15 or entry_gap_atr > float(variant.max_entry_gap_atr):
                 continue
 
+        entry_vs_prev_low_pct = np.nan
+        prev_day_low = frame.at[i, "prev_day_low"]
+        if pd.notna(prev_day_low) and float(prev_day_low) != 0.0:
+            entry_vs_prev_low_pct = ((entry_price - float(prev_day_low)) / float(prev_day_low)) * 100.0
+        if side == "SHORT" and variant.min_entry_vs_prev_low_pct is not None:
+            if not math.isfinite(float(entry_vs_prev_low_pct)) or float(entry_vs_prev_low_pct) < float(variant.min_entry_vs_prev_low_pct):
+                continue
+
+        signal_upper_wick_pct = float(frame.at[i, "upper_wick_pct_range"]) if pd.notna(frame.at[i, "upper_wick_pct_range"]) else np.nan
+        if side == "SHORT" and variant.max_signal_upper_wick_pct_range is not None:
+            if not math.isfinite(signal_upper_wick_pct) or signal_upper_wick_pct > float(variant.max_signal_upper_wick_pct_range):
+                continue
+
+        dist_above_swing_low_atr = float(frame.at[entry_idx, "dist_above_swing_low_atr"]) if pd.notna(frame.at[entry_idx, "dist_above_swing_low_atr"]) else np.nan
+        if side == "SHORT" and variant.min_dist_above_swing_low_atr is not None:
+            if not math.isfinite(dist_above_swing_low_atr) or dist_above_swing_low_atr < float(variant.min_dist_above_swing_low_atr):
+                continue
+
         entry_mfi = float(frame.at[i, "mfi14"])
         prev_mfi = float(frame.at[i - 1, "mfi14"])
         if variant.require_mfi_rebound:
@@ -388,6 +428,9 @@ def _build_candidates(frame: pd.DataFrame, variant: Variant, analysis_start: pd.
                 "entry_mfi": float(entry_mfi),
                 "reset_mfi_extreme": float(reset["reset_mfi_extreme"]),
                 "entry_vidya_ref": float(vidya_ref_entry),
+                "entry_vs_prev_low_pct": float(entry_vs_prev_low_pct) if math.isfinite(float(entry_vs_prev_low_pct)) else np.nan,
+                "signal_upper_wick_pct_range": float(signal_upper_wick_pct) if math.isfinite(signal_upper_wick_pct) else np.nan,
+                "dist_above_swing_low_atr": float(dist_above_swing_low_atr) if math.isfinite(dist_above_swing_low_atr) else np.nan,
             }
         )
     return candidates
@@ -637,6 +680,9 @@ def main() -> int:
         Variant(name="ctx5_short_hybrid_tp2_half", side_mode="short_only", session_mode="all", require_ctx5_align=True, require_ctx5_rf_not_opposite=True, min_reset_bars=1, max_reset_bars=30, min_neutral_bars=0, require_counter_weak=False, max_bars_since_regime=240, deep_touch_min_atr=-1.20, deep_touch_max_atr=0.80, max_entry_gap_atr=2.00, require_mfi_rebound=False, be_arm_r=0.80, be_mfi_long=60.0, be_mfi_short=40.0, take_profit_r=2.0, partial_tp_fraction=0.5, max_hold_bars=240),
         Variant(name="ctx5_short_hybrid_tp15_half", side_mode="short_only", session_mode="all", require_ctx5_align=True, require_ctx5_rf_not_opposite=True, min_reset_bars=1, max_reset_bars=30, min_neutral_bars=0, require_counter_weak=False, max_bars_since_regime=240, deep_touch_min_atr=-1.20, deep_touch_max_atr=0.80, max_entry_gap_atr=2.00, require_mfi_rebound=False, be_arm_r=0.80, be_mfi_long=60.0, be_mfi_short=40.0, take_profit_r=1.5, partial_tp_fraction=0.5, max_hold_bars=240),
         Variant(name="ctx5_short_hybrid_quality", side_mode="short_only", session_mode="all", require_ctx5_align=True, require_ctx5_rf_not_opposite=True, min_reset_bars=1, max_reset_bars=24, min_neutral_bars=0, require_counter_weak=False, max_bars_since_regime=240, deep_touch_min_atr=-1.20, deep_touch_max_atr=0.35, max_entry_gap_atr=1.30, require_mfi_rebound=False, be_arm_r=0.80, be_mfi_long=60.0, be_mfi_short=40.0, take_profit_r=2.0, partial_tp_fraction=0.5, max_hold_bars=240),
+        Variant(name="ctx5_short_hybrid_structure_room", side_mode="short_only", session_mode="all", require_ctx5_align=True, require_ctx5_rf_not_opposite=True, min_reset_bars=1, max_reset_bars=24, min_neutral_bars=0, require_counter_weak=False, max_bars_since_regime=240, deep_touch_min_atr=-1.20, deep_touch_max_atr=0.15, max_entry_gap_atr=1.20, require_mfi_rebound=False, be_arm_r=0.80, be_mfi_long=60.0, be_mfi_short=40.0, take_profit_r=2.0, partial_tp_fraction=0.5, max_hold_bars=240),
+        Variant(name="ctx5_short_hybrid_market_room", side_mode="short_only", session_mode="all", require_ctx5_align=True, require_ctx5_rf_not_opposite=True, min_reset_bars=1, max_reset_bars=24, min_neutral_bars=0, require_counter_weak=False, max_bars_since_regime=240, deep_touch_min_atr=-1.20, deep_touch_max_atr=0.35, max_entry_gap_atr=1.10, require_mfi_rebound=False, be_arm_r=0.80, be_mfi_long=60.0, be_mfi_short=40.0, take_profit_r=2.0, partial_tp_fraction=0.5, max_hold_bars=240, min_entry_vs_prev_low_pct=0.0, min_dist_above_swing_low_atr=2.0),
+        Variant(name="ctx5_short_hybrid_ny_pa", side_mode="short_only", session_mode="all", require_ctx5_align=True, require_ctx5_rf_not_opposite=True, min_reset_bars=1, max_reset_bars=24, min_neutral_bars=0, require_counter_weak=False, max_bars_since_regime=240, deep_touch_min_atr=-1.20, deep_touch_max_atr=0.35, max_entry_gap_atr=1.10, require_mfi_rebound=False, be_arm_r=0.80, be_mfi_long=60.0, be_mfi_short=40.0, take_profit_r=2.0, partial_tp_fraction=0.5, max_hold_bars=240, min_entry_vs_prev_low_pct=0.10, max_signal_upper_wick_pct_range=0.25),
     ]
 
     results = [_run_variant(frame, variant, analysis_start=analysis_start) for variant in variants]

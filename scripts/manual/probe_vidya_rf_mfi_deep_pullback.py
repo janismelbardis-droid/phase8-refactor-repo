@@ -53,6 +53,7 @@ class Variant:
     be_mfi_short: float = 35.0
     stop_buffer_atr: float = 0.10
     take_profit_r: Optional[float] = None
+    partial_tp_fraction: float = 1.0
     max_hold_bars: int = 240
 
 
@@ -400,6 +401,13 @@ def _simulate_trade(frame: pd.DataFrame, candidate: dict[str, Any], variant: Var
     risk_abs = float(candidate["risk_abs"])
     qty = float(position_notional) / entry_price
     take_profit_price = None if variant.take_profit_r is None else (entry_price + float(variant.take_profit_r) * risk_abs if side == "LONG" else entry_price - float(variant.take_profit_r) * risk_abs)
+    remaining_qty = float(qty)
+    partial_realized_net = 0.0
+    partial_realized_gross = 0.0
+    partial_exit_fee = 0.0
+    partial_tp_hit = False
+    partial_tp_time = None
+    partial_tp_price = None
 
     be_armed = False
     pending_stop = stop_price
@@ -415,26 +423,46 @@ def _simulate_trade(frame: pd.DataFrame, candidate: dict[str, Any], variant: Var
 
         if side == "LONG":
             hit_stop = low <= pending_stop
-            hit_take = take_profit_price is not None and high >= float(take_profit_price)
+            hit_take = (take_profit_price is not None) and (not partial_tp_hit) and high >= float(take_profit_price)
         else:
             hit_stop = high >= pending_stop
-            hit_take = take_profit_price is not None and low <= float(take_profit_price)
+            hit_take = (take_profit_price is not None) and (not partial_tp_hit) and low <= float(take_profit_price)
 
         if hit_stop and hit_take:
-            exit_idx = i
-            exit_price = float(pending_stop)
-            exit_reason = "stop_before_target"
-            break
+            if float(variant.partial_tp_fraction) < 1.0:
+                hit_take = True
+                hit_stop = False
+            else:
+                exit_idx = i
+                exit_price = float(pending_stop)
+                exit_reason = "stop_before_target"
+                break
         if hit_stop:
             exit_idx = i
             exit_price = float(pending_stop)
             exit_reason = "stop"
             break
         if hit_take:
-            exit_idx = i
-            exit_price = float(take_profit_price)
-            exit_reason = "take_profit"
-            break
+            tp_fraction = max(0.0, min(1.0, float(variant.partial_tp_fraction)))
+            tp_qty = remaining_qty * tp_fraction
+            tp_price = float(take_profit_price)
+            if tp_qty > 0.0:
+                partial_gross = ((tp_price - entry_price) * tp_qty) if side == "LONG" else ((entry_price - tp_price) * tp_qty)
+                fee_tp = abs(tp_price * tp_qty) * float(fee_rate)
+                partial_realized_gross += float(partial_gross)
+                partial_realized_net += float(partial_gross - fee_tp)
+                partial_exit_fee += float(fee_tp)
+                remaining_qty -= tp_qty
+                partial_tp_hit = True
+                partial_tp_time = str(pd.Timestamp(frame.at[i, "ts"]))
+                partial_tp_price = float(tp_price)
+                pending_stop = max(float(entry_price), pending_stop) if side == "LONG" else min(float(entry_price), pending_stop)
+                be_armed = True
+                if remaining_qty <= 1e-12:
+                    exit_idx = i
+                    exit_price = tp_price
+                    exit_reason = "take_profit"
+                    break
 
         close = float(row["close"])
         vidya_line = float(row["vidya_line"])
@@ -464,10 +492,11 @@ def _simulate_trade(frame: pd.DataFrame, candidate: dict[str, Any], variant: Var
             exit_reason = "time_stop"
             break
 
-    gross = ((exit_price - entry_price) * qty) if side == "LONG" else ((entry_price - exit_price) * qty)
+    runner_gross = ((exit_price - entry_price) * remaining_qty) if side == "LONG" else ((entry_price - exit_price) * remaining_qty)
     fee_entry = float(position_notional) * float(fee_rate)
-    fee_exit = abs(exit_price * qty) * float(fee_rate)
-    net = gross - fee_entry - fee_exit
+    fee_exit = abs(exit_price * remaining_qty) * float(fee_rate)
+    gross = partial_realized_gross + runner_gross
+    net = partial_realized_net + runner_gross - fee_entry - fee_exit
     return {
         **candidate,
         "exit_idx": int(exit_idx),
@@ -479,6 +508,12 @@ def _simulate_trade(frame: pd.DataFrame, candidate: dict[str, Any], variant: Var
         "return_pct_on_notional": float(net / float(position_notional) * 100.0),
         "be_armed": bool(be_armed),
         "take_profit_price": (None if take_profit_price is None else float(take_profit_price)),
+        "partial_tp_hit": bool(partial_tp_hit),
+        "partial_tp_fraction": float(variant.partial_tp_fraction),
+        "partial_tp_time": partial_tp_time,
+        "partial_tp_price": partial_tp_price,
+        "remaining_qty_exit": float(remaining_qty),
+        "partial_exit_fee": float(partial_exit_fee),
     }
 
 
@@ -516,6 +551,7 @@ def _run_variant(frame: pd.DataFrame, variant: Variant, analysis_start: pd.Times
         "avg_trade_pnl": float(np.mean([float(t["net_pnl"]) for t in trades])) if trades else 0.0,
         "max_drawdown_pct": float(max_dd_pct),
         "be_armed_count": int(sum(1 for t in trades if bool(t["be_armed"]))),
+        "partial_tp_hit_count": int(sum(1 for t in trades if bool(t.get("partial_tp_hit")))),
         "vidya_break_exits": int(sum(1 for t in trades if str(t["exit_reason"]) == "vidya_break")),
         "take_profit_exits": int(sum(1 for t in trades if str(t["exit_reason"]) == "take_profit")),
         "time_stop_exits": int(sum(1 for t in trades if str(t["exit_reason"]) == "time_stop")),
@@ -554,14 +590,14 @@ def _render_report(payload: dict[str, Any]) -> str:
     lines.append(f"- analysis_start_utc: `{payload['analysis_start_utc']}`")
     lines.append(f"- analysis_end_utc: `{payload['analysis_end_utc']}`")
     lines.append("")
-    lines.append("| Variant | Return % | Trades | Signals | Win Rate % | PF | Max DD % | BE Armed | Vidya Break Exits |")
-    lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
+    lines.append("| Variant | Return % | Trades | Signals | Win Rate % | PF | Max DD % | BE Armed | Partial TP Hits | Vidya Break Exits |")
+    lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
     for row in payload["results"]:
         s = row["summary"]
         lines.append(
             f"| `{s['variant']}` | `{s['return_pct']:.2f}` | `{s['trade_count']}` | `{s['signal_count']}` | "
             f"`{s['win_rate_pct']:.2f}` | `{s['profit_factor']:.3f}` | `{s['max_drawdown_pct']:.2f}` | "
-            f"`{s['be_armed_count']}` | `{s['vidya_break_exits']}` |"
+            f"`{s['be_armed_count']}` | `{s['partial_tp_hit_count']}` | `{s['vidya_break_exits']}` |"
         )
     if payload.get("best_variant"):
         best = payload["best_variant"]
@@ -598,6 +634,9 @@ def main() -> int:
         Variant(name="ctx5_state_flush_short", side_mode="short_only", session_mode="all", require_ctx5_align=True, require_ctx5_rf_not_opposite=True, min_reset_bars=3, max_reset_bars=20, min_neutral_bars=2, require_counter_weak=True, require_state_flush=True, max_bars_since_regime=120, deep_touch_min_atr=-0.75, deep_touch_max_atr=0.20, max_entry_gap_atr=0.60, require_mfi_rebound=True, require_mfi_flush=True, reset_mfi_long_max=40.0, entry_mfi_long_min=50.0, reset_mfi_short_min=58.0, entry_mfi_short_max=52.0, be_arm_r=0.75, be_mfi_long=62.0, be_mfi_short=40.0, take_profit_r=2.0, max_hold_bars=240),
         Variant(name="ctx5_short_loose_tp2", side_mode="short_only", session_mode="all", require_ctx5_align=True, require_ctx5_rf_not_opposite=True, min_reset_bars=1, max_reset_bars=30, min_neutral_bars=0, require_counter_weak=False, max_bars_since_regime=240, deep_touch_min_atr=-1.20, deep_touch_max_atr=0.80, max_entry_gap_atr=2.00, require_mfi_rebound=False, be_arm_r=0.80, be_mfi_long=60.0, be_mfi_short=40.0, take_profit_r=2.0, max_hold_bars=240),
         Variant(name="ctx5_short_loose_no_tp", side_mode="short_only", session_mode="all", require_ctx5_align=True, require_ctx5_rf_not_opposite=True, min_reset_bars=1, max_reset_bars=30, min_neutral_bars=0, require_counter_weak=False, max_bars_since_regime=240, deep_touch_min_atr=-1.20, deep_touch_max_atr=0.80, max_entry_gap_atr=2.00, require_mfi_rebound=False, be_arm_r=0.80, be_mfi_long=60.0, be_mfi_short=40.0, take_profit_r=None, max_hold_bars=240),
+        Variant(name="ctx5_short_hybrid_tp2_half", side_mode="short_only", session_mode="all", require_ctx5_align=True, require_ctx5_rf_not_opposite=True, min_reset_bars=1, max_reset_bars=30, min_neutral_bars=0, require_counter_weak=False, max_bars_since_regime=240, deep_touch_min_atr=-1.20, deep_touch_max_atr=0.80, max_entry_gap_atr=2.00, require_mfi_rebound=False, be_arm_r=0.80, be_mfi_long=60.0, be_mfi_short=40.0, take_profit_r=2.0, partial_tp_fraction=0.5, max_hold_bars=240),
+        Variant(name="ctx5_short_hybrid_tp15_half", side_mode="short_only", session_mode="all", require_ctx5_align=True, require_ctx5_rf_not_opposite=True, min_reset_bars=1, max_reset_bars=30, min_neutral_bars=0, require_counter_weak=False, max_bars_since_regime=240, deep_touch_min_atr=-1.20, deep_touch_max_atr=0.80, max_entry_gap_atr=2.00, require_mfi_rebound=False, be_arm_r=0.80, be_mfi_long=60.0, be_mfi_short=40.0, take_profit_r=1.5, partial_tp_fraction=0.5, max_hold_bars=240),
+        Variant(name="ctx5_short_hybrid_quality", side_mode="short_only", session_mode="all", require_ctx5_align=True, require_ctx5_rf_not_opposite=True, min_reset_bars=1, max_reset_bars=24, min_neutral_bars=0, require_counter_weak=False, max_bars_since_regime=240, deep_touch_min_atr=-1.20, deep_touch_max_atr=0.35, max_entry_gap_atr=1.30, require_mfi_rebound=False, be_arm_r=0.80, be_mfi_long=60.0, be_mfi_short=40.0, take_profit_r=2.0, partial_tp_fraction=0.5, max_hold_bars=240),
     ]
 
     results = [_run_variant(frame, variant, analysis_start=analysis_start) for variant in variants]

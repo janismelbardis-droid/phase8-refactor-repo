@@ -76,8 +76,8 @@ def main() -> None:
         interval = interval.strip()
         print(f"Downloading {args.symbol} {interval} from {start_utc} to {end_utc} ...")
         df = download_klines(args.symbol.upper(), interval, start_ms, end_ms)
-        out_path = os.path.join(symbol_dir, f"{args.symbol.upper()}_{interval}.csv")
-        df.to_csv(out_path, index=False)
+        out_path = os.path.join(symbol_dir, f"{args.symbol.upper()}_{interval}.parquet")
+        df.to_parquet(out_path, index=False, compression="zstd")
         print(f"  saved {len(df)} rows -> {out_path}")
 
 

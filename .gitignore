@@ -16,6 +16,7 @@ __pycache__/
 # Tick / runtime scratch
 /data_cache/*
 !/data_cache/README.md
+!/data_cache/ohlcv_store/
 /runs/
 
 # OS / editor noise

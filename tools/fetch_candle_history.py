@@ -211,6 +211,51 @@ def fetch(symbol: str, price_source: str, start: dt.date, work_dir: Path,
 
 
 # --------------------------------------------------------------------------- #
+# resample 1m -> higher timeframes
+# --------------------------------------------------------------------------- #
+# Standard UTC-aligned timeframes. Resampling 1m into these is exact (verified
+# bit-for-bit against the Binance archive), so we never re-download them.
+_TF_RULES = {"3m": "3min", "5m": "5min", "15m": "15min", "30m": "30min",
+             "1h": "1h", "2h": "2h", "4h": "4h", "6h": "6h", "12h": "12h", "1d": "1D"}
+
+
+def _resample_1m(df: pd.DataFrame, rule: str) -> pd.DataFrame:
+    g = df.set_index("open_time").resample(rule, label="left", closed="left", origin="start_day")
+    out = g.agg(open=("open", "first"), high=("high", "max"), low=("low", "min"),
+                close=("close", "last"), volume=("volume", "sum"))
+    return out.dropna(subset=["open"]).reset_index()
+
+
+def resample(symbol: str, price_source: str, timeframes: List[str], out_root: Path) -> List[Path]:
+    src_dir = out_root / symbol / price_source / "1m"
+    files = sorted(src_dir.glob(f"{symbol}_{price_source}_1m_*.parquet"))
+    if not files:
+        _log(f"No 1m files under {src_dir}. Run fetch first.")
+        return []
+    base = _normalize(pd.concat([pd.read_parquet(f) for f in files], ignore_index=True))
+    base = base[COMPACT_COLUMNS]
+    _log(f"Loaded {len(base):,} 1m candles; resampling -> {', '.join(timeframes)}")
+
+    written: List[Path] = []
+    for tf in timeframes:
+        rule = _TF_RULES.get(tf.lower())
+        if rule is None:
+            _log(f"  skip unknown timeframe '{tf}' (known: {', '.join(_TF_RULES)})")
+            continue
+        res = _resample_1m(base, rule)
+        out_dir = out_root / symbol / price_source / tf
+        out_dir.mkdir(parents=True, exist_ok=True)
+        year = pd.to_datetime(res["open_time"], utc=True).dt.year
+        for yr, group in res.groupby(year, sort=True):
+            out_path = out_dir / f"{symbol}_{price_source}_{tf}_{yr}.parquet"
+            group.reset_index(drop=True).to_parquet(out_path, index=False, compression="zstd")
+            written.append(out_path)
+        total_mb = sum(p.stat().st_size for p in written if f"_{tf}_" in p.name) / 1e6
+        _log(f"  {tf}: {len(res):,} candles -> {_rel(out_dir)} ({total_mb:.1f} MB)")
+    return written
+
+
+# --------------------------------------------------------------------------- #
 # restore into the app's data_cache/ohlcv_store layout
 # --------------------------------------------------------------------------- #
 def restore(symbol: str, price_source: str, out_root: Path, cache_dir: Path) -> int:
@@ -251,7 +296,7 @@ def _git(*args: str) -> str:
                           capture_output=True, text=True).stdout.strip()
 
 
-def git_push(paths: List[Path]) -> None:
+def git_push(paths: List[Path], message: str) -> None:
     if not paths:
         _log("Nothing to push.")
         return
@@ -261,7 +306,7 @@ def git_push(paths: List[Path]) -> None:
     if not status.strip():
         _log("No changes to commit.")
         return
-    _git("commit", "-m", "Add BTCUSDT 1m candle history (compact yearly parquet)")
+    _git("commit", "-m", message)
     for attempt, backoff in enumerate((2, 4, 8, 16, 0), start=1):
         try:
             _git("push", "-u", "origin", branch)
@@ -279,11 +324,14 @@ def git_push(paths: List[Path]) -> None:
 # --------------------------------------------------------------------------- #
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("command", nargs="?", default="fetch", choices=["fetch", "restore"],
-                        help="fetch = download history; restore = expand into data_cache for the app")
+    parser.add_argument("command", nargs="?", default="fetch", choices=["fetch", "resample", "restore"],
+                        help="fetch = download 1m history; resample = build higher timeframes from 1m; "
+                             "restore = expand 1m into data_cache for the app")
     parser.add_argument("--symbol", default="BTCUSDT")
     parser.add_argument("--price-source", default="LAST", choices=["LAST", "MARK", "INDEX"])
     parser.add_argument("--start", default="2020-01-01", help="start date YYYY-MM-DD (default 2020-01-01)")
+    parser.add_argument("--timeframes", default="5m,15m,1h,4h",
+                        help="comma-separated timeframes for resample (default 5m,15m,1h,4h)")
     parser.add_argument("--out-dir", default=str(REPO_ROOT / "market_data"),
                         help="git-tracked output root for compact yearly parquet")
     parser.add_argument("--work-dir", default=str(REPO_ROOT / ".candle_cache"),
@@ -303,6 +351,19 @@ def main(argv: Optional[List[str]] = None) -> int:
         restore(symbol, price_source, out_root, Path(args.cache_dir))
         return 0
 
+    if args.command == "resample":
+        timeframes = [t.strip() for t in args.timeframes.split(",") if t.strip()]
+        written = resample(symbol, price_source, timeframes, out_root)
+        if not written:
+            return 1
+        total_mb = sum(p.stat().st_size for p in written) / 1e6
+        _log(f"Done. {len(written)} file(s), {total_mb:.1f} MB total under {_rel(out_root)}/")
+        if args.push:
+            git_push(written, f"Add {symbol} {price_source} {args.timeframes} candle history (resampled from 1m)")
+        else:
+            _log("Review the files, then commit & push (or re-run with --push).")
+        return 0
+
     start = dt.date.fromisoformat(args.start)
     _log(f"Fetching {symbol} {price_source} 1m candles from {start} to today via data.binance.vision")
     written = fetch(symbol, price_source, start, Path(args.work_dir), out_root, full=args.full)
@@ -312,7 +373,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     total_mb = sum(p.stat().st_size for p in written) / 1e6
     _log(f"Done. {len(written)} yearly file(s), {total_mb:.1f} MB total under {_rel(out_root)}/")
     if args.push:
-        git_push(written)
+        git_push(written, f"Add {symbol} {price_source} 1m candle history (compact yearly parquet)")
     else:
         _log("Review the files, then commit & push (or re-run with --push).")
     return 0

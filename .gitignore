@@ -18,6 +18,9 @@ __pycache__/
 !/data_cache/README.md
 /runs/
 
+# Raw downloaded candle zips (scratch for tools/fetch_candle_history.py)
+/.candle_cache/
+
 # OS / editor noise
 .DS_Store
 .vscode/

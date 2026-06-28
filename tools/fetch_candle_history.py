@@ -9,14 +9,14 @@ historical archive ``data.binance.vision`` (served via CloudFront) is reachable
 from both the cloud session and a normal local machine, and it is far cheaper
 for bulk history (one zip per month/day instead of thousands of REST calls).
 
-This script downloads the full 1m candle history from a start date up to "now",
-and writes it as compact, lossless **yearly parquet files** (zstd) that are
-small enough to commit to git.
+This script downloads candle history (any timeframe) from a start date up to
+"now" and writes it as compact **yearly parquet files** (zstd) that are small
+enough to commit to git.
 
 Typical use (run on YOUR machine, then push):
 
-    python tools/fetch_candle_history.py
-    python tools/fetch_candle_history.py --push      # also git add/commit/push
+    python tools/fetch_candle_history.py                              # 1m (default)
+    python tools/fetch_candle_history.py --timeframes 1m,5m,15m,1h,4h --push
 
 Restore the compact files into the app's data_cache layout so the desktop app
 and backtests can read them:
@@ -157,13 +157,13 @@ def _normalize(df: pd.DataFrame) -> pd.DataFrame:
 # --------------------------------------------------------------------------- #
 # month / range fetching
 # --------------------------------------------------------------------------- #
-def _fetch_month(symbol: str, year: int, month: int, today: dt.date, work_dir: Path) -> pd.DataFrame:
-    """Fetch one calendar month. Prefer the monthly zip; fall back to daily zips."""
+def _fetch_month(symbol: str, interval: str, year: int, month: int, today: dt.date, work_dir: Path) -> pd.DataFrame:
+    """Fetch one calendar month of `interval` klines. Prefer the monthly zip; fall back to daily zips."""
     pieces: List[pd.DataFrame] = []
-    monthly_url = f"{VISION_BASE}/monthly/klines/{symbol}/1m/{symbol}-1m-{year:04d}-{month:02d}.zip"
+    monthly_url = f"{VISION_BASE}/monthly/klines/{symbol}/{interval}/{symbol}-{interval}-{year:04d}-{month:02d}.zip"
     blob = _cached_zip(monthly_url, work_dir)
     if blob is not None:
-        _log(f"  monthly {year:04d}-{month:02d}")
+        _log(f"  monthly {interval} {year:04d}-{month:02d}")
         pieces.append(_parse_zip_csv(blob))
     else:
         # No monthly archive yet (current/most-recent month): use daily files.
@@ -172,21 +172,21 @@ def _fetch_month(symbol: str, year: int, month: int, today: dt.date, work_dir: P
             d = dt.date(year, month, day)
             if d >= today:  # today's archive is not published yet
                 break
-            daily_url = f"{VISION_BASE}/daily/klines/{symbol}/1m/{symbol}-1m-{d.isoformat()}.zip"
+            daily_url = f"{VISION_BASE}/daily/klines/{symbol}/{interval}/{symbol}-{interval}-{d.isoformat()}.zip"
             dblob = _cached_zip(daily_url, work_dir)
             if dblob is None:
                 continue
-            _log(f"  daily {d.isoformat()}")
+            _log(f"  daily {interval} {d.isoformat()}")
             pieces.append(_parse_zip_csv(dblob))
     if not pieces:
         return pd.DataFrame(columns=KLINE_COLUMNS)
     return _normalize(pd.concat(pieces, ignore_index=True))
 
 
-def fetch(symbol: str, price_source: str, start: dt.date, work_dir: Path,
+def fetch(symbol: str, price_source: str, interval: str, start: dt.date, work_dir: Path,
           out_root: Path, full: bool = False) -> List[Path]:
     today = dt.datetime.now(dt.timezone.utc).date()
-    out_dir = out_root / symbol / price_source / "1m"
+    out_dir = out_root / symbol / price_source / interval
     out_dir.mkdir(parents=True, exist_ok=True)
     work_dir.mkdir(parents=True, exist_ok=True)
     keep = KLINE_COLUMNS if full else COMPACT_COLUMNS
@@ -197,61 +197,16 @@ def fetch(symbol: str, price_source: str, start: dt.date, work_dir: Path,
         last_month = today.month if year == today.year else 12
         year_pieces: List[pd.DataFrame] = []
         for month in range(first_month, last_month + 1):
-            year_pieces.append(_fetch_month(symbol, year, month, today, work_dir))
+            year_pieces.append(_fetch_month(symbol, interval, year, month, today, work_dir))
         year_df = _normalize(pd.concat(year_pieces, ignore_index=True)) if year_pieces else pd.DataFrame(columns=KLINE_COLUMNS)
         if year_df.empty:
-            _log(f"{year}: no data")
+            _log(f"{interval} {year}: no data")
             continue
-        out_path = out_dir / f"{symbol}_{price_source}_1m_{year}.parquet"
+        out_path = out_dir / f"{symbol}_{price_source}_{interval}_{year}.parquet"
         year_df[keep].to_parquet(out_path, index=False, compression="zstd")
         size_mb = out_path.stat().st_size / 1e6
-        _log(f"{year}: {len(year_df):,} candles -> {_rel(out_path)} ({size_mb:.1f} MB)")
+        _log(f"{interval} {year}: {len(year_df):,} candles -> {_rel(out_path)} ({size_mb:.1f} MB)")
         written.append(out_path)
-    return written
-
-
-# --------------------------------------------------------------------------- #
-# resample 1m -> higher timeframes
-# --------------------------------------------------------------------------- #
-# Standard UTC-aligned timeframes. Resampling 1m into these is exact (verified
-# bit-for-bit against the Binance archive), so we never re-download them.
-_TF_RULES = {"3m": "3min", "5m": "5min", "15m": "15min", "30m": "30min",
-             "1h": "1h", "2h": "2h", "4h": "4h", "6h": "6h", "12h": "12h", "1d": "1D"}
-
-
-def _resample_1m(df: pd.DataFrame, rule: str) -> pd.DataFrame:
-    g = df.set_index("open_time").resample(rule, label="left", closed="left", origin="start_day")
-    out = g.agg(open=("open", "first"), high=("high", "max"), low=("low", "min"),
-                close=("close", "last"), volume=("volume", "sum"))
-    return out.dropna(subset=["open"]).reset_index()
-
-
-def resample(symbol: str, price_source: str, timeframes: List[str], out_root: Path) -> List[Path]:
-    src_dir = out_root / symbol / price_source / "1m"
-    files = sorted(src_dir.glob(f"{symbol}_{price_source}_1m_*.parquet"))
-    if not files:
-        _log(f"No 1m files under {src_dir}. Run fetch first.")
-        return []
-    base = _normalize(pd.concat([pd.read_parquet(f) for f in files], ignore_index=True))
-    base = base[COMPACT_COLUMNS]
-    _log(f"Loaded {len(base):,} 1m candles; resampling -> {', '.join(timeframes)}")
-
-    written: List[Path] = []
-    for tf in timeframes:
-        rule = _TF_RULES.get(tf.lower())
-        if rule is None:
-            _log(f"  skip unknown timeframe '{tf}' (known: {', '.join(_TF_RULES)})")
-            continue
-        res = _resample_1m(base, rule)
-        out_dir = out_root / symbol / price_source / tf
-        out_dir.mkdir(parents=True, exist_ok=True)
-        year = pd.to_datetime(res["open_time"], utc=True).dt.year
-        for yr, group in res.groupby(year, sort=True):
-            out_path = out_dir / f"{symbol}_{price_source}_{tf}_{yr}.parquet"
-            group.reset_index(drop=True).to_parquet(out_path, index=False, compression="zstd")
-            written.append(out_path)
-        total_mb = sum(p.stat().st_size for p in written if f"_{tf}_" in p.name) / 1e6
-        _log(f"  {tf}: {len(res):,} candles -> {_rel(out_dir)} ({total_mb:.1f} MB)")
     return written
 
 
@@ -324,14 +279,13 @@ def git_push(paths: List[Path], message: str) -> None:
 # --------------------------------------------------------------------------- #
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("command", nargs="?", default="fetch", choices=["fetch", "resample", "restore"],
-                        help="fetch = download 1m history; resample = build higher timeframes from 1m; "
-                             "restore = expand 1m into data_cache for the app")
+    parser.add_argument("command", nargs="?", default="fetch", choices=["fetch", "restore"],
+                        help="fetch = download history from Binance; restore = expand 1m into data_cache for the app")
     parser.add_argument("--symbol", default="BTCUSDT")
     parser.add_argument("--price-source", default="LAST", choices=["LAST", "MARK", "INDEX"])
     parser.add_argument("--start", default="2020-01-01", help="start date YYYY-MM-DD (default 2020-01-01)")
-    parser.add_argument("--timeframes", default="5m,15m,1h,4h",
-                        help="comma-separated timeframes for resample (default 5m,15m,1h,4h)")
+    parser.add_argument("--timeframes", default="1m",
+                        help="comma-separated timeframes to download (e.g. 1m,5m,15m,1h,4h)")
     parser.add_argument("--out-dir", default=str(REPO_ROOT / "market_data"),
                         help="git-tracked output root for compact yearly parquet")
     parser.add_argument("--work-dir", default=str(REPO_ROOT / ".candle_cache"),
@@ -351,29 +305,19 @@ def main(argv: Optional[List[str]] = None) -> int:
         restore(symbol, price_source, out_root, Path(args.cache_dir))
         return 0
 
-    if args.command == "resample":
-        timeframes = [t.strip() for t in args.timeframes.split(",") if t.strip()]
-        written = resample(symbol, price_source, timeframes, out_root)
-        if not written:
-            return 1
-        total_mb = sum(p.stat().st_size for p in written) / 1e6
-        _log(f"Done. {len(written)} file(s), {total_mb:.1f} MB total under {_rel(out_root)}/")
-        if args.push:
-            git_push(written, f"Add {symbol} {price_source} {args.timeframes} candle history (resampled from 1m)")
-        else:
-            _log("Review the files, then commit & push (or re-run with --push).")
-        return 0
-
+    timeframes = [t.strip() for t in args.timeframes.split(",") if t.strip()]
     start = dt.date.fromisoformat(args.start)
-    _log(f"Fetching {symbol} {price_source} 1m candles from {start} to today via data.binance.vision")
-    written = fetch(symbol, price_source, start, Path(args.work_dir), out_root, full=args.full)
+    written: List[Path] = []
+    for tf in timeframes:
+        _log(f"Fetching {symbol} {price_source} {tf} candles from {start} to today via data.binance.vision")
+        written += fetch(symbol, price_source, tf, start, Path(args.work_dir), out_root, full=args.full)
     if not written:
         _log("No files written.")
         return 1
     total_mb = sum(p.stat().st_size for p in written) / 1e6
-    _log(f"Done. {len(written)} yearly file(s), {total_mb:.1f} MB total under {_rel(out_root)}/")
+    _log(f"Done. {len(written)} file(s), {total_mb:.1f} MB total under {_rel(out_root)}/")
     if args.push:
-        git_push(written, f"Add {symbol} {price_source} 1m candle history (compact yearly parquet)")
+        git_push(written, f"Add {symbol} {price_source} {args.timeframes} candle history (downloaded from Binance)")
     else:
         _log("Review the files, then commit & push (or re-run with --push).")
     return 0

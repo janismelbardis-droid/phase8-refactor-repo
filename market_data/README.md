@@ -21,9 +21,7 @@ file per year per timeframe, zstd-compressed. Verified gap-free.
 | 1h        |    56,880 | ~2 MB   |
 | 4h        |    14,220 | ~0.5 MB |
 
-Only the 1m set is downloaded; 5m/15m/1h/4h are **resampled from 1m** (exact for
-these UTC-aligned timeframes — verified bit-for-bit against the Binance archive),
-so they stay perfectly consistent with the minute data.
+Every timeframe is downloaded directly from the Binance archive.
 
 Compact schema (per row): `open_time, open, high, low, close, volume`.
 `close_time` and the extra Binance volume columns (`quote_volume`,
@@ -39,15 +37,9 @@ environment — see `CLAUDE.md`).
 ## Regenerate / update / use
 
 ```bash
-# Download or refresh the 1m history (incremental: re-uses cached zips):
-python tools/fetch_candle_history.py
-
-# Rebuild the higher timeframes from 1m (default 5m,15m,1h,4h):
-python tools/fetch_candle_history.py resample
-
-# Either command takes --push to also commit + push, and --symbol / --timeframes:
-python tools/fetch_candle_history.py --push
-python tools/fetch_candle_history.py resample --timeframes 5m,15m,1h,4h,1d --push
+# Download or refresh history (incremental: re-uses cached zips). --timeframes
+# selects which to pull; --push also commits + pushes; --symbol for other markets:
+python tools/fetch_candle_history.py --timeframes 1m,5m,15m,1h,4h --push
 
 # Expand the 1m set into data_cache/ohlcv_store so the desktop app / backtests can read it:
 python tools/fetch_candle_history.py restore

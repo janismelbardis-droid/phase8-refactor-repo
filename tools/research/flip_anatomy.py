@@ -1,71 +1,72 @@
 """
-Anatomy of every BTCUSDT #2 regime flip (5m), then group by CHARACTER and
-profile each group's behaviour. No binary single-filter testing: build a rich
-multi-timeframe context per flip, cluster into characters, then see how each
-character behaves and what the good ones have in common.
+Anatomy of every BTCUSDT #2 regime flip, grouped by CHARACTER, with per-cluster
+behaviour AND a per-year money table (trades / win / ROI / max drawdown) for the
+best character. Works on any base timeframe (--base): higher/lower TF context is
+shifted accordingly. BTC only.
 
-Context per flip (no lookahead):
-  WHY / BEFORE : prior-regime length & size, extension from mean, impulse into
-                 the flip, how deep price pulled back just before flipping.
-  HIGHER TF    : 15m / 1h / 4h #2 trend alignment + 4h extension.
-  LOWER TF     : 1m momentum and 1m volatility inside the flip.
-  CHARACTER    : volatility regime, volume spike, candle body/wick, session.
-
-Behaviour (label, NOT clustered on): forward MFE/MAE, continuation rate,
-fixed-harvest win-rate and its per-year stability.
+  python tools/research/flip_anatomy.py --base 5m  --fee 0.04
+  python tools/research/flip_anatomy.py --base 15m --fee 0.04
 """
 from __future__ import annotations
-import os, numpy as np, pandas as pd, sys
+import argparse, os, numpy as np, pandas as pd, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import regime_change_research as base
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 
-H = 96   # forward horizon (8h)
+CTX = {  # base -> (ltf, [htf...]) as (tf, minutes)
+    "5m":  (("1m", 1),  [("15m", 15), ("1h", 60), ("4h", 240)]),
+    "15m": (("5m", 5),  [("1h", 60), ("4h", 240)]),
+    "1h":  (("15m", 15), [("4h", 240)]),
+}
+H = 96  # forward horizon in base bars
 
 
-def htf_trend_on5(d5, tf, minutes):
+def htf_on(dbase, tf, minutes):
     dtf = base.load(tf, os.path.join(base.REPO, "market_data"))
     itf = base.ind_atrfib(dtf)
-    ext = ((dtf["close"].to_numpy() - itf["basis"]) / itf["atr"])
+    ext = (dtf["close"].to_numpy() - itf["basis"]) / itf["atr"]
     df = pd.DataFrame({"avail": dtf["open_time"] + pd.Timedelta(minutes=minutes),
                        "t": itf["t"], "ext": ext}).sort_values("avail")
-    m = pd.merge_asof(d5[["open_time"]].sort_values("open_time"), df,
+    m = pd.merge_asof(dbase[["open_time"]].sort_values("open_time"), df,
                       left_on="open_time", right_on="avail", direction="backward")
     return m["t"].fillna(0).to_numpy(), m["ext"].fillna(0).to_numpy()
 
 
 def main():
-    d5 = base.load("5m", os.path.join(base.REPO, "market_data"))
-    i2 = base.ind_atrfib(d5)
-    c = d5["close"].to_numpy(float); h = d5["high"].to_numpy(float); l = d5["low"].to_numpy(float)
-    o = d5["open"].to_numpy(float); v = d5["volume"].to_numpy(float)
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--base", default="5m", choices=list(CTX))
+    ap.add_argument("--fee", type=float, default=0.04)
+    ap.add_argument("--k", type=int, default=6)
+    args = ap.parse_args()
+    (ltf, ltf_min), htfs = CTX[args.base]
+
+    d = base.load(args.base, os.path.join(base.REPO, "market_data"))
+    i2 = base.ind_atrfib(d)
+    c = d["close"].to_numpy(float); h = d["high"].to_numpy(float); l = d["low"].to_numpy(float)
+    o = d["open"].to_numpy(float); v = d["volume"].to_numpy(float)
     t = i2["t"]; atrv = i2["atr"]; basis = i2["basis"]; n = len(c)
-    hour = d5["open_time"].dt.hour.to_numpy(); year = d5["open_time"].dt.year.to_numpy()
+    hour = d["open_time"].dt.hour.to_numpy(); year = d["open_time"].dt.year.to_numpy()
 
-    # HTF context
-    t15, e15 = htf_trend_on5(d5, "15m", 15)
-    t1h, e1h = htf_trend_on5(d5, "1h", 60)
-    t4h, e4h = htf_trend_on5(d5, "4h", 240)
+    htf_t = {}; htf_e = {}
+    for tf, mins in htfs:
+        htf_t[tf], htf_e[tf] = htf_on(d, tf, mins)
 
-    # LTF (1m) precomputed momentum & vol, mapped by time
-    d1 = base.load("1m", os.path.join(base.REPO, "market_data"))
-    c1 = d1["close"].to_numpy(float)
-    ret1 = np.diff(np.log(c1), prepend=np.log(c1[0]))
-    m1_mom = pd.Series(ret1).rolling(15).sum().to_numpy()          # 15-min log return
-    m1_vol = pd.Series(ret1).rolling(15).std().to_numpy()          # 15-min realized vol
-    ot1 = d1["open_time"].values.astype("datetime64[ns]")
-    ot5 = d5["open_time"].values.astype("datetime64[ns]")
-    idx1 = np.searchsorted(ot1, ot5, side="right") - 1             # last closed 1m bar at/just before 5m close
+    dl = base.load(ltf, os.path.join(base.REPO, "market_data"))
+    cl_ = dl["close"].to_numpy(float)
+    retl = np.diff(np.log(cl_), prepend=np.log(cl_[0]))
+    win_ltf = max(3, 15 // ltf_min)
+    l_mom = pd.Series(retl).rolling(win_ltf).sum().to_numpy()
+    l_vol = pd.Series(retl).rolling(win_ltf).std().to_numpy()
+    otl = dl["open_time"].values.astype("datetime64[ns]")
+    otb = d["open_time"].values.astype("datetime64[ns]")
+    idxl = np.searchsorted(otl, otb, side="right") - 1
 
     rng = np.maximum(h - l, 1e-9)
-    body = (c - o) / rng
-    uwick = (h - np.maximum(o, c)) / rng
-    lwick = (np.minimum(o, c) - l) / rng
+    body = (c - o) / rng; uwick = (h - np.maximum(o, c)) / rng; lwick = (np.minimum(o, c) - l) / rng
     vz = ((pd.Series(v) - pd.Series(v).rolling(100).mean()) / (pd.Series(v).rolling(100).std() + 1e-9)).to_numpy()
     atr_pct = atrv / c
 
-    # legs / flips
     legs = []; i = 0
     while i < n:
         if t[i] == 0: i += 1; continue
@@ -73,109 +74,85 @@ def main():
         while j + 1 < n and t[j + 1] == t[i]: j += 1
         legs.append((i, j, t[i])); i = j + 1
 
+    near_tf = htfs[0][0]  # the nearest higher TF (the "pullback" TF)
+    far_tf = htfs[-1][0]
     rows = []
     for li in range(1, len(legs)):
-        s, e, d = legs[li]
-        ps, pe, pd_ = legs[li - 1]
+        s, e, dd = legs[li]; ps, pe, _ = legs[li - 1]
         if s < 30 or atrv[s] <= 0:
             continue
         a = atrv[s]
-        # WHY / BEFORE
-        prior_bars = pe - ps + 1
-        prior_move = abs(c[pe] - c[ps]) / a
-        extension = d * (c[s] - basis[s]) / a
-        runup = d * (c[s] - c[s - 6]) / a
+        prior_bars = pe - ps + 1; prior_move = abs(c[pe] - c[ps]) / a
+        extension = dd * (c[s] - basis[s]) / a; runup = dd * (c[s] - c[s - 6]) / a
         W = 12
-        if d == 1:
-            recent_pullback = (c[s] - l[s - W:s].min()) / a      # how far above recent low
-        else:
-            recent_pullback = (h[s - W:s].max() - c[s]) / a
-        # LTF
-        j1 = idx1[s]
-        mom1 = d * m1_mom[j1] / atr_pct[s] if not np.isnan(m1_mom[j1]) else 0.0
-        vol1 = (m1_vol[j1] / np.nanmedian(m1_vol)) if not np.isnan(m1_vol[j1]) else 1.0
-        # forward behaviour
-        end = min(s + H, n - 1)
-        hh = h[s + 1:end + 1]; ll = l[s + 1:end + 1]
+        recent_pullback = (c[s] - l[s - W:s].min()) / a if dd == 1 else (h[s - W:s].max() - c[s]) / a
+        j1 = idxl[s]
+        mom1 = dd * l_mom[j1] / atr_pct[s] if not np.isnan(l_mom[j1]) else 0.0
+        vol1 = l_vol[j1] / np.nanmedian(l_vol) if not np.isnan(l_vol[j1]) else 1.0
+        feat = dict(prior_bars=prior_bars, prior_move=prior_move, extension=extension,
+                    runup=runup, recent_pullback=recent_pullback, l_mom=mom1, l_vol=vol1,
+                    atr_pct=atr_pct[s] * 100, vz=vz[s] if not np.isnan(vz[s]) else 0.0,
+                    body=dd * body[s], rejwick=(lwick[s] if dd == 1 else uwick[s]))
+        for tf, _ in htfs:
+            feat[f"t_{tf}"] = dd * np.sign(htf_t[tf][s])
+        feat["htf_conf"] = sum(feat[f"t_{tf}"] for tf, _ in htfs)
+        feat["e_far"] = dd * htf_e[far_tf][s]
+        # forward MFE/MAE + harvest
+        end = min(s + H, n - 1); hh = h[s + 1:end + 1]; ll = l[s + 1:end + 1]
         if len(hh) == 0:
             continue
-        if d == 1:
+        if dd == 1:
             mfe = (hh.max() - c[s]) / a; mae = (c[s] - ll.min()) / a
+            th = np.where(hh >= c[s] + 1.5 * a)[0]; sh = np.where(ll <= c[s] - 2.0 * a)[0]
         else:
             mfe = (c[s] - ll.min()) / a; mae = (hh.max() - c[s]) / a
-        # continuation = reach +2ATR favorable before -2ATR adverse (path)
-        tp = 2.0 * a; sl = 2.0 * a
-        if d == 1:
-            th = np.where(hh >= c[s] + tp)[0]; sh = np.where(ll <= c[s] - sl)[0]
-        else:
-            th = np.where(ll <= c[s] - tp)[0]; sh = np.where(hh >= c[s] + sl)[0]
+            th = np.where(ll <= c[s] - 1.5 * a)[0]; sh = np.where(hh >= c[s] + 2.0 * a)[0]
         ti = th[0] if len(th) else 10**9; si = sh[0] if len(sh) else 10**9
-        cont = 1 if ti < si else 0
-        # harvest TP1.5/SL2 win
-        tph = 1.5 * a; slh = 2.0 * a
-        if d == 1:
-            th2 = np.where(hh >= c[s] + tph)[0]; sh2 = np.where(ll <= c[s] - slh)[0]
-        else:
-            th2 = np.where(ll <= c[s] - tph)[0]; sh2 = np.where(hh >= c[s] + slh)[0]
-        ti2 = th2[0] if len(th2) else 10**9; si2 = sh2[0] if len(sh2) else 10**9
-        hwin = 1 if (ti2 < si2) else (0 if si2 < 10**9 else np.nan)
-
-        rows.append(dict(
-            year=int(year[s]), dir=int(d),
-            prior_bars=prior_bars, prior_move=prior_move, extension=extension,
-            runup=runup, recent_pullback=recent_pullback,
-            t15=d * t15[s], t1h=d * t1h[s], t4h=d * t4h[s],
-            htf_conf=d * (np.sign(t15[s]) + np.sign(t1h[s]) + np.sign(t4h[s])),
-            e4h=d * e4h[s], m1_mom=mom1, m1_vol=vol1,
-            atr_pct=atr_pct[s] * 100, vz=vz[s] if not np.isnan(vz[s]) else 0.0,
-            body=d * body[s], rejwick=(lwick[s] if d == 1 else uwick[s]),
-            hour=int(hour[s]),
-            mfe=mfe, mae=mae, cont=cont, hwin=hwin))
+        hwin = 1 if ti < si else (0 if si < 10**9 else np.nan)
+        feat.update(year=int(year[s]), dir=int(dd), atr_pct_raw=atr_pct[s] * 100,
+                    mfe=mfe, mae=mae, hwin=hwin)
+        rows.append(feat)
     F = pd.DataFrame(rows).dropna(subset=["hwin"]).reset_index(drop=True)
-    print(f"flips analysed: {len(F)}")
-
-    FEATURES = ["prior_bars", "prior_move", "extension", "runup", "recent_pullback",
-                "t15", "t1h", "t4h", "htf_conf", "e4h", "m1_mom", "m1_vol",
-                "atr_pct", "vz", "body", "rejwick"]
+    FEATURES = [c for c in F.columns if c not in ("year", "dir", "atr_pct_raw", "mfe", "mae", "hwin")]
+    print(f"\nbase {args.base}: flips {len(F)}  | features {len(FEATURES)}  | fee≈{args.fee/ (F['atr_pct_raw'].median()):.2f} ATR")
     X = StandardScaler().fit_transform(F[FEATURES].fillna(0).values)
-    K = 6
-    F["cl"] = KMeans(n_clusters=K, n_init=10, random_state=0).fit_predict(X)
+    F["cl"] = KMeans(n_clusters=args.k, n_init=10, random_state=0).fit_predict(X)
+    print(f"baseline harvest-win {F['hwin'].mean()*100:.0f}%  medMFE {F['mfe'].median():.2f}/MAE {F['mae'].median():.2f}\n")
 
-    base_hwin = F["hwin"].mean() * 100
-    base_cont = F["cont"].mean() * 100
-    print(f"baseline: harvest-win {base_hwin:.0f}%  continuation {base_cont:.0f}%  medMFE {F['mfe'].median():.2f}  medMAE {F['mae'].median():.2f}\n")
+    def equity_table(g, label):
+        ap_ = g["atr_pct_raw"].to_numpy(); win = g["hwin"].to_numpy()
+        net = np.where(win == 1, 1.5 * ap_, -2.0 * ap_) - args.fee; R = net / (2.0 * ap_)
+        eq = 10000.0; cur = []
+        for r in R: eq *= (1 + 0.01 * r); cur.append(eq)
+        g = g.assign(eq=cur)
+        roi = (eq / 10000 - 1) * 100; e = np.concatenate([[10000.0], cur]); dd = (1 - e / np.maximum.accumulate(e)).max() * 100
+        pf = R[R > 0].sum() / -R[R < 0].sum() if (R < 0).any() else 9
+        print(f"  ==== {label} (fee {args.fee}%, risk 1%) ====")
+        print(f"   ВСЕГО: сделок {len(g)}  win {(win==1).mean()*100:.0f}%  ROI {roi:+.0f}%  maxDD {dd:.0f}%  PF {pf:.2f}  avgR {R.mean():+.3f}")
+        print(f"   {'год':>4} {'сделок':>7} {'win':>5} {'ROI':>7} {'просадка':>9}")
+        s0 = 10000.0
+        for y, gg in g.groupby("year"):
+            e1 = gg["eq"].iloc[-1]; eqs = np.concatenate([[s0], gg["eq"].to_numpy()]); ddy = (1 - eqs / np.maximum.accumulate(eqs)).max() * 100
+            print(f"   {y:>4} {len(gg):>7} {(gg['hwin']==1).mean()*100:>4.0f}% {(e1/s0-1)*100:>+6.0f}% {ddy:>8.1f}%")
+            s0 = e1
 
-    rep = []
-    for cl in range(K):
-        g = F[F["cl"] == cl]
-        # distinguishing features: standardized mean
+    prof = []
+    for k in range(args.k):
+        g = F[F["cl"] == k]
+        ap_ = g["atr_pct_raw"].to_numpy(); win = g["hwin"].to_numpy()
+        avgR = (np.where(win == 1, 1.5 * ap_, -2.0 * ap_) - args.fee) / (2.0 * ap_)
         z = {f: (g[f].mean() - F[f].mean()) / (F[f].std() + 1e-9) for f in FEATURES}
         top = sorted(z.items(), key=lambda kv: -abs(kv[1]))[:4]
-        desc = ", ".join(f"{k}{'↑' if val>0 else '↓'}" for k, val in top)
-        # per-year stability of harvest win
-        yr_w = [g[g["year"] == y]["hwin"].mean() * 100 for y in range(2020, 2027) if (g["year"] == y).sum() >= 10]
-        yr_consistent = np.std(yr_w) if yr_w else 99
-        rep.append(dict(cl=cl, n=len(g), hwin=g["hwin"].mean() * 100, cont=g["cont"].mean() * 100,
-                        medMFE=g["mfe"].median(), medMAE=g["mae"].median(),
-                        mfe_mae=g["mfe"].median() / max(g["mae"].median(), 0.1),
-                        yr_sd=yr_consistent, desc=desc))
-    R = pd.DataFrame(rep).sort_values("hwin", ascending=False)
-    pd.set_option("display.width", 220)
-    print("===== FLIP CHARACTERS (groups), sorted by harvest win-rate =====")
-    for _, r in R.iterrows():
-        print(f"\n  cluster {int(r['cl'])}  n={int(r['n'])}  | harvest-WIN {r['hwin']:.0f}%  continuation {r['cont']:.0f}%  "
-              f"MFE/MAE {r['mfe_mae']:.2f} (med {r['medMFE']:.1f}/{r['medMAE']:.1f})  yr-SD {r['yr_sd']:.0f}")
-        print(f"     character: {r['desc']}")
-
-    # readable per-year for the best and worst cluster
-    best = int(R.iloc[0]["cl"]); worst = int(R.iloc[-1]["cl"])
-    for tag, cl in [("BEST", best), ("WORST", worst)]:
-        g = F[F["cl"] == cl]
-        pys = " ".join(f"{y}:{g[g['year']==y]['hwin'].mean()*100:.0f}%(n{(g['year']==y).sum()})" for y in range(2020, 2027) if (g['year']==y).sum() >= 5)
-        print(f"\n  {tag} cluster {cl} harvest-win by year: {pys}")
-
-    F.to_csv(os.path.join(base.REPO, "tools", "research", "output", "flip_anatomy.csv"), index=False)
-    print("\n(per-flip table -> tools/research/output/flip_anatomy.csv)")
+        prof.append(dict(cl=k, n=len(g), win=win.mean() * 100, avgR=avgR.mean(),
+                         desc=", ".join(f"{a}{'↑' if b>0 else '↓'}" for a, b in top)))
+    P = pd.DataFrame(prof).sort_values("avgR", ascending=False)
+    print("===== CHARACTERS sorted by net avgR (after fee) =====")
+    for _, r in P.iterrows():
+        print(f"  cl{int(r['cl'])} n={int(r['n']):4d}  win {r['win']:.0f}%  netAvgR {r['avgR']:+.3f}  | {r['desc']}")
+    print()
+    bestcl = int(P.iloc[0]["cl"])
+    equity_table(F[F["cl"] == bestcl], f"BEST cluster {bestcl}")
+    F.to_csv(os.path.join(base.REPO, "tools", "research", "output", f"flip_anatomy_{args.base}.csv"), index=False)
 
 
 if __name__ == "__main__":

@@ -60,11 +60,42 @@ edge on their own: 15m alignment, single-indicator confluence (#1 or #3),
 session-of-day. The edge lives in the *volatility/rejection/volume* context plus
 the continuation direction, not in higher-timeframe agreement.
 
+## Stage 3 — market structure (the real lift)
+
+Lagging-indicator filters were weak. Adding price-action **mechanics** —
+swing pivots (HH/HL/LH/LL), Break of Structure, liquidity sweeps, position in
+range — produced edges that survive **out-of-sample**.
+
+Method (`tools/research/structure_edge.py`): SELECT configs on **2020-2023**,
+keep only those also positive on **2024-2026**. The framework correctly killed
+an in-sample star (`posHigh`: IS +0.074 → OOS −0.096), proving it discriminates
+signal from overfit.
+
+Two interpretable survivors (net at maker 0.04% round-trip):
+
+| setup  | side | filter | TP×ATR | SL×ATR | time | OOS exp | OOS PF | per-year |
+|--------|------|--------|--------|--------|------|---------|--------|----------|
+| flip   | cont | **noBOS** | 2.0 | 3.0 | 8h  | +0.093% | 1.58 | **+ in 6/7 yrs** |
+| flip   | cont | noBOS  | 4.0 | 3.0 | 24h | +0.201% | 1.84 | + in 5/7 yrs |
+| pocket | cont | **sweep** | 3.0 | 3.0 | 8h  | +0.124% | 1.65 | + in 6/7 yrs |
+
+- **noBOS-flip**: enter with the trend on a regime change that has **not yet**
+  broken the prior swing (still has room to structure) — don't chase the
+  exhausted break.
+- **sweep-pocket**: a pocket pullback that follows a **liquidity sweep**
+  (stop-hunt) continues the trend.
+
+Caveats: per-trade edge is modest (~+0.03…+0.10%), per-year samples small
+(n≈13–47), maker fills / slippage not modelled, BTC-only. A real but modest
+foundation — next: combine the two signals, confirm with order-flow (tick), and
+widen the sample to other symbols.
+
 ## Reproduce
 
 ```bash
 python tools/research/regime_change_research.py --fee 0.08   # realistic taker
 python tools/research/regime_change_research.py --fee 0.04   # maker / limit
 python tools/research/regime_change_research.py --fee 0.0    # raw signal
-# full ranked grid -> tools/research/output/all_results.csv
+python tools/research/structure_edge.py --fee 0.04           # market-structure, IS/OOS
+# grids -> tools/research/output/{all_results,structure_results}.csv
 ```

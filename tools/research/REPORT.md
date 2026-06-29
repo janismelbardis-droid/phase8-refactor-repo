@@ -90,6 +90,33 @@ Caveats: per-trade edge is modest (~+0.03…+0.10%), per-year samples small
 foundation — next: combine the two signals, confirm with order-flow (tick), and
 widen the sample to other symbols.
 
+## Stage 4 — MFE/MAE profile and the timeframe/cost insight
+
+Full characterization of every regime change (`tools/research/mfe_profile.py`):
+- Nearly every flip produces a move: **MFE median ≈ 4.9 ATR**, 88% reach ≥1 ATR,
+  77% reach ≥2 ATR; median time-to-peak ≈ 32 bars. But **MAE ≈ MFE** (you suffer
+  almost as much against you first), and **no bar-close context** (BOS/sweep/
+  structure/confluence/position) separates the win-rate — all cluster 53–58%.
+- The win-rate is, however, **remarkably stable year to year** (~57%).
+
+Why 5m doesn't pay: ATR on 5m ≈ 0.19%, so a 0.04% fee ≈ **0.2 ATR per round
+trip** — a fifth of the move you are harvesting. The stable edge is real but
+smaller than the cost at this timeframe.
+
+**The stable, fee-surviving configuration is on 1h** (`mfe_profile` logic at 1h;
+ATR ≈ 0.77%, fee ≈ 0.05 ATR — negligible):
+
+| TF | entry | exit | win | ROI (1% risk) | maxDD | drop-top-10 |
+|----|-------|------|-----|---------------|-------|-------------|
+| 1h | regime change | fixed **TP1.5 / SL2 ATR** | 61% | +11% | **7%** | still **+3%** |
+
+Per-year win 62/54/63/58/62/70/53% — consistent. Unlike the trail-to-flip trend
+variant (+867% but −27% after dropping 10 trades, all in 2020), this fixed
+harvest is **smooth and not outlier-dependent** — the stable-equity profile.
+Absolute return is modest at 1% risk; it scales by **breadth** (a basket of
+perps: `tools/research/portfolio_harvest_1h.py`) and sizing (7% DD leaves room),
+not by leverage on one symbol.
+
 ## Reproduce
 
 ```bash

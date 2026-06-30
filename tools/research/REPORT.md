@@ -142,6 +142,35 @@ Scaling is by risk %, at the cost of drawdown: 1%->~19%/yr/11%DD,
 volatility halves (2025-2026); a structure-based (swing-level) target is the
 ATR-free way to adapt — open next step.
 
+## Stage 6 — why strategies "break" in 2025-2026, and why 5m doesn't
+
+Many momentum strategies degrade in the same 2025-2026 window. Diagnosis by year
+(15m): 2025 has the **most flips, shortest legs, and MFE>MAE drops 70%→54%** —
+the market chops more and *follow-through dries up*. Every flip/momentum strategy
+shares the same DNA ("bet on continuation"), so they all sag together. It is a
+**market-regime** problem, not a per-strategy bug.
+
+Crucially, this chop is a 15m-scale phenomenon. The **same rule on 5m does NOT
+break in 2025**, because the faster timeframe still finds intraday movement, and
+the large 3% target makes the per-trade fee negligible (the earlier "5m doesn't
+work" was only true for *small* targets).
+
+**Best validated configuration — BTC 5m, every flip, TP+3%/SL-2%, ride to next
+flip** (`strategy_15m_flip.py --tf 5m`), 3118 trades, conservative cost 0.12%:
+
+| | ROI | CAGR | maxDD | per-year | drop-top-20 |
+|---|-----|------|-------|----------|-------------|
+| 5m TP3/SL2 @0.12% | +712% | ~38%/yr | 11% | **+ in 7/7 (2025 +40%)** | +510% |
+| 5m TP3/SL2 @0.08% | +1415% | ~52%/yr | 10% | + in 7/7 (2025 +56%) | +1034% |
+
+Stress tests all pass: broad TP/SL plateau (every cell positive, 2025 positive
+in every cell), survives dropping the top 50 trades, cost-robust to ~0.15%.
+
+Honest risks: ~480 trades/yr (automation required); cost is the live make-or-
+break (great ≤0.15%, degrades by 0.20%); **funding not modelled** (hours-long
+holds cross funding settlements — partly absorbed by the cost buffer); backtest
+fills only.
+
 ## Reproduce
 
 ```bash

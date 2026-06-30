@@ -19,8 +19,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import regime_change_research as base
 
 
-def run(tp, sl, cost):
-    d = base.load("15m", os.path.join(base.REPO, "market_data"))
+def run(tp, sl, cost, tf="15m"):
+    d = base.load(tf, os.path.join(base.REPO, "market_data"))
     i2 = base.ind_atrfib(d)
     c = d["close"].to_numpy(float); h = d["high"].to_numpy(float); l = d["low"].to_numpy(float)
     t = i2["t"]; n = len(c); year = d["open_time"].dt.year.to_numpy(); ot = d["open_time"].to_numpy()
@@ -52,18 +52,19 @@ def maxdd(e): p = np.maximum.accumulate(e); return float((1-e/p).max()*100)
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--tp", type=float, default=3.0); ap.add_argument("--sl", type=float, default=2.0)
+    ap.add_argument("--tf", default="15m"); ap.add_argument("--tp", type=float, default=3.0)
+    ap.add_argument("--sl", type=float, default=2.0)
     ap.add_argument("--cost", type=float, default=0.08, help="per-trade cost %% (fee+slippage)")
     ap.add_argument("--risk", type=float, default=1.0)
     a = ap.parse_args()
-    T = run(a.tp, a.sl, a.cost)
+    T = run(a.tp, a.sl, a.cost, a.tf)
     risk = a.risk/100.0
     eq = 10000.0; cur = []
     for _, r in T.iterrows(): eq *= (1 + risk*r["R"]); cur.append(eq)
     T["eq"] = cur
     roi = (eq/10000-1)*100; dd = maxdd(np.concatenate([[10000.0], np.array(cur)]))
     R = T["R"]; pf = R[R > 0].sum()/-R[R < 0].sum(); cagr = ((eq/10000)**(1/6.5)-1)*100
-    print(f"\nBTC 15m flip  TP{a.tp}% / SL{a.sl}%  cost {a.cost}%  risk {a.risk}%/trade")
+    print(f"\nBTC {a.tf} flip  TP{a.tp}% / SL{a.sl}%  cost {a.cost}%  risk {a.risk}%/trade")
     print(f"ВСЕГО: сделок {len(T)}  win {(T['netpct']>0).mean()*100:.0f}%  ROI {roi:+.0f}%  ~{cagr:+.0f}%/год  "
           f"maxDD {dd:.0f}%  PF {pf:.2f}  avgR {R.mean():+.3f}")
     print(f"\n  {'год':>4} {'сделок':>7} {'win':>5} {'ROI':>7} {'просадка':>9}")
@@ -80,14 +81,14 @@ def main():
         for x in Rr: e *= (1 + risk*x)
         print(f"    drop top {N:2d}: ROI {(e/10000-1)*100:+.0f}%")
     out = os.path.join(base.REPO, "tools", "research", "output"); os.makedirs(out, exist_ok=True)
-    T.to_csv(os.path.join(out, "strategy_15m_trades.csv"), index=False)
+    T.to_csv(os.path.join(out, f"strategy_{a.tf}_trades.csv"), index=False)
     try:
         import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
         fig, ax = plt.subplots(figsize=(11, 6))
         ax.plot(pd.to_datetime(T["t"]), T["eq"])
-        ax.set_title(f"BTC 15m flip TP{a.tp}/SL{a.sl} cost {a.cost}% risk {a.risk}% (ROI {roi:+.0f}%, DD {dd:.0f}%)")
+        ax.set_title(f"BTC {a.tf} flip TP{a.tp}/SL{a.sl} cost {a.cost}% risk {a.risk}% (ROI {roi:+.0f}%, DD {dd:.0f}%)")
         ax.set_ylabel("equity $"); ax.grid(True, alpha=0.3)
-        fig.tight_layout(); fig.savefig(os.path.join(out, "strategy_15m_equity.png"), dpi=110)
+        fig.tight_layout(); fig.savefig(os.path.join(out, f"strategy_{a.tf}_equity.png"), dpi=110)
         print(f"\n  equity -> {os.path.join(out,'strategy_15m_equity.png')}")
     except Exception as ex:
         print("plot skipped:", ex)

@@ -1,17 +1,20 @@
 """
-BTCUSDT 15m flip strategy — the validated baseline of this research.
+BTCUSDT flip strategy — CORRECTED (no lookahead).
 
 Rule (BTC only, no ATR, no extra filters):
   - On every #2 regime flip, enter in the flip direction at the bar close.
   - Fixed take-profit +TP% and stop -SL% (default +3% / -2%).
-  - If neither is hit, exit at the next flip (ride the regime).
-  - Risk a fixed fraction of equity per trade (stop = SL%).
+  - If neither is hit, exit when the NEXT flip is CONFIRMED, i.e. at c[e+1]
+    (the bar where the trend actually changes) — NOT c[e]. Exiting at c[e] is a
+    one-bar lookahead that dodges the adverse bar which causes every flip.
 
-Validation (committed in REPORT.md): positive in 7/7 years, survives dropping
-the top-20 trades, sits on a broad TP/SL plateau (not a curve-fit cell), and
-stays profitable up to ~0.12% per-trade cost (maker+taker+slippage).
+IMPORTANT: an earlier version exited at c[e] and reported huge returns
+(15m +282%, 5m +712%). Those were a LOOKAHEAD ARTIFACT. With the honest exit:
+  - 5m  TP3/SL2 @0.08%: ROI -47% (loses).
+  - 15m TP3/SL2 @0.08%: ROI +26% (~4%/yr, PF 1.06, 27% DD) — too thin to trade.
+i.e. no real edge. See REPORT.md "Correction".
 
-  python tools/research/strategy_15m_flip.py --tp 3 --sl 2 --cost 0.08 --risk 1
+  python tools/research/strategy_15m_flip.py --tf 15m --tp 3 --sl 2 --cost 0.08
 """
 from __future__ import annotations
 import argparse, os, numpy as np, pandas as pd, sys
@@ -32,7 +35,10 @@ def run(tp, sl, cost, tf="15m"):
         legs.append((i, j, t[i])); i = j + 1
     rows = []
     for (s, e, dd) in legs:
-        entry = c[s]; hi = h[s+1:e+1]; lo = l[s+1:e+1]
+        # NO LOOKAHEAD: the flip is only confirmed at the close of bar e+1 (where t
+        # changes), so we may hold and exit there, not at c[e]. Scan TP/SL through e+1.
+        ee = min(e + 1, n - 1)
+        entry = c[s]; hi = h[s+1:ee+1]; lo = l[s+1:ee+1]
         if len(hi) == 0:
             continue
         if dd == 1:
@@ -42,7 +48,7 @@ def run(tp, sl, cost, tf="15m"):
         ti = th[0] if len(th) else 10**9; si = sh[0] if len(sh) else 10**9
         if si <= ti and si < 10**9: g = -sl
         elif ti < si: g = tp
-        else: g = dd*(c[e]/entry-1)*100
+        else: g = dd*(c[ee]/entry-1)*100        # exit at the confirmed-flip bar, not c[e]
         rows.append(dict(t=ot[s], year=int(year[s]), dir=int(dd), netpct=g-cost, R=(g-cost)/sl))
     return pd.DataFrame(rows)
 

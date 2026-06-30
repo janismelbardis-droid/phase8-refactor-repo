@@ -1,3 +1,13 @@
+> **CORRECTION (read first).** Stage 5 (15m +282%) and Stage 6 (5m +712%) were a
+> **lookahead artifact**: the "ride to next flip" exit used `c[e]` (close of the
+> last leg bar) instead of `c[e+1]` (where the flip is actually confirmed),
+> dodging the adverse bar that causes every flip — and ~70% of trades used that
+> exit. With the honest exit (`strategy_15m_flip.py`, fixed): 5m TP3/SL2 @0.08%
+> = **-47%** (loses); 15m = **+26% (~4%/yr, PF 1.06, 27% DD)** — too thin to
+> trade. Net honest conclusion of the whole study: **no robust, tradeable edge
+> from these candle indicators.** The only lookahead-free positive variants were
+> fat-tailed (trail-to-flip, carried by ~3 trades) — also not tradeable.
+
 # Regime-change research — ATR Fibonacci (#2) on BTCUSDT 5m
 
 What happens on the 5-minute chart **after a #2 regime change**, and is there a

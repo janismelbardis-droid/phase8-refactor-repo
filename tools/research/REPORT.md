@@ -117,6 +117,31 @@ Absolute return is modest at 1% risk; it scales by **breadth** (a basket of
 perps: `tools/research/portfolio_harvest_1h.py`) and sizing (7% DD leaves room),
 not by leverage on one symbol.
 
+## Stage 5 — the validated baseline strategy (BTC 15m flip)
+
+Dropping ATR and the multi-filter machinery, the simplest version is the
+strongest. Rule: on **every** #2 regime flip, enter in the flip direction; fixed
+**TP +3% / SL -2%**; if neither hits, exit at the next flip (ride the regime);
+risk a fixed fraction per trade. No ATR, no trend filter (EMA50/200 did not
+separate MFE), no clustering. `tools/research/strategy_15m_flip.py`.
+
+Result (978 trades, 2020-2026, cost 0.08% = full taker, risk 1%/trade):
+**ROI +214% (~19%/yr), max drawdown 11%, PF 1.28.**
+
+Why we trust it (autonomous stress tests):
+- **Per year:** positive 2020-2024 (+8…+43%), flat 2025-2026 (+0…+1%, low-vol).
+- **Outlier-robust:** drop the top 20 trades -> still +135%.
+- **Parameter plateau, not a fit:** every cell of TP[2-4] x SL[1.5-3] is
+  positive (+123…+300%), almost all positive in 6-7/7 years — a broad smooth
+  surface, the signature of a real edge.
+- **Cost-robust:** +282% @0.04% maker, +214% @0.08% taker, +158% @0.12%
+  (taker+slippage); only breaks near 0.30%/trade.
+
+Scaling is by risk %, at the cost of drawdown: 1%->~19%/yr/11%DD,
+2%->~40%/yr/22%DD, 3%->~70%/yr/29%DD. Known weakness: fixed % targets sag when
+volatility halves (2025-2026); a structure-based (swing-level) target is the
+ATR-free way to adapt — open next step.
+
 ## Reproduce
 
 ```bash
